@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}My Groups — World Cup Pool{% endblock %}
+{% block content %}
+<div class="flex items-center justify-between mb-6">
+  <h1 class="text-2xl font-bold">My Groups</h1>
+  <div class="flex gap-2">
+    <a href="/groups/join"
+      class="bg-white border border-gray-300 rounded px-3 py-1.5 text-sm hover:bg-gray-50 transition-colors">
+      Join group
+    </a>
+    <a href="/groups/new"
+      class="bg-green-600 text-white rounded px-3 py-1.5 text-sm hover:bg-green-700 transition-colors">
+      + New group
+    </a>
+  </div>
+</div>
+{% if groups %}
+  <div class="space-y-3">
+    {% for group in groups %}
+      <div class="bg-white rounded-lg shadow p-5">
+        <h2 class="font-semibold text-lg">{{ group.name }}</h2>
+        <div class="flex gap-4 mt-1 text-sm text-gray-500">
+          <span>Stake: <span class="font-medium text-gray-700">{% if group.stake %}{{ group.stake }}{% else %}Free{% endif %}</span></span>
+          <span>Code: <span class="font-mono font-semibold text-gray-800">{{ group.join_code }}</span></span>
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+{% else %}
+  <div class="text-center py-16 text-gray-500">
+    <p class="text-lg font-medium">You're not in any groups yet.</p>
+    <p class="mt-2 text-sm">
+      <a href="/groups/new" class="text-green-600 hover:underline">Create one</a>
+      or
+      <a href="/groups/join" class="text-green-600 hover:underline">join with a code</a>.
+    </p>
+  </div>
+{% endif %}
+{% endblock %}

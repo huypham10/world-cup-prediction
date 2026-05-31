@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}World Cup Pool{% endblock %}</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/htmx.org@1.9.12/dist/htmx.min.js"></script>
+</head>
+<body class="bg-gray-50 min-h-screen">
+  <nav class="bg-green-700 text-white px-6 py-3 flex items-center justify-between shadow">
+    <a href="/" class="font-bold text-lg tracking-tight">World Cup Pool</a>
+    <div class="flex gap-5 items-center text-sm">
+      {% if current_user %}
+        <span class="opacity-75">{{ current_user.name }}</span>
+        <a href="/groups" class="hover:underline">Groups</a>
+        <a href="/matches" class="hover:underline">Matches</a>
+        {% if current_user.id == 1 %}
+          <a href="/admin" class="hover:underline">Admin</a>
+        {% endif %}
+        <form method="post" action="/logout" class="inline">
+          <button type="submit" class="hover:underline">Logout</button>
+        </form>
+      {% else %}
+        <a href="/login" class="hover:underline">Login</a>
+        <a href="/register" class="font-semibold hover:underline">Register</a>
+      {% endif %}
+    </div>
+  </nav>
+  <main class="max-w-2xl mx-auto mt-8 px-4 pb-16">
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>

@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}Set new PIN — World Cup Pool{% endblock %}
+{% block content %}
+<div class="bg-white rounded-lg shadow p-8 max-w-md mx-auto">
+  <h1 class="text-2xl font-bold mb-2">Set a new PIN</h1>
+  <p class="text-sm text-gray-600 mb-6">Your PIN was reset by an admin. Choose a new 6-digit PIN to continue.</p>
+  {% if errors %}
+    <ul class="mb-4 text-red-600 text-sm space-y-1 bg-red-50 rounded p-3">
+      {% for err in errors %}<li>{{ err }}</li>{% endfor %}
+    </ul>
+  {% endif %}
+  <form method="post" action="/set-pin" class="space-y-4">
+    <input type="hidden" name="name" value="{{ name }}">
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-1">New 6-digit PIN</label>
+      <input name="pin" type="password" inputmode="numeric" pattern="[0-9]{6}" maxlength="6"
+        placeholder="••••••" required autofocus
+        class="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-500">
+    </div>
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-1">Confirm new PIN</label>
+      <input name="pin_confirm" type="password" inputmode="numeric" pattern="[0-9]{6}" maxlength="6"
+        placeholder="••••••" required
+        class="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-500">
+    </div>
+    <button type="submit"
+      class="w-full bg-green-600 text-white py-2 px-4 rounded hover:bg-green-700 font-medium transition-colors">
+      Set PIN and log in
+    </button>
+  </form>
+</div>
+{% endblock %}

@@ -1,0 +1,17 @@
+name: Poll and settle
+
+on:
+  schedule:
+    - cron: "*/20 * * * *"   # every 20 minutes, all day
+  workflow_dispatch:           # allow a manual run from the Actions tab
+
+jobs:
+  poll:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Trigger poll-and-settle endpoint
+        run: |
+          curl --fail-with-body --max-time 30 -X POST \
+            -H "X-Task-Secret: ${{ secrets.TASK_SECRET }}" \
+            "${{ secrets.APP_URL }}/tasks/poll"
