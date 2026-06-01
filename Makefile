@@ -1,10 +1,14 @@
-.PHONY: run migrate poll install
+.PHONY: run migrate migrate-prod poll install
 
 run:
 	.venv/bin/uvicorn app.main:app --reload
 
 migrate:
 	set -a && source .env && set +a && .venv/bin/alembic upgrade head
+
+migrate-prod:
+	@test -n "$(PROD_DATABASE_URL)" || (echo "Usage: make migrate-prod PROD_DATABASE_URL=<url>" && exit 1)
+	DATABASE_URL=$(PROD_DATABASE_URL) .venv/bin/alembic upgrade head
 
 poll:
 	set -a && source .env && set +a && .venv/bin/python -m app.tasks.poll_and_settle

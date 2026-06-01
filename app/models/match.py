@@ -23,6 +23,7 @@ class Match(Base):
     external_id: Mapped[Optional[str]] = mapped_column(
         String(40), unique=True, index=True, nullable=True
     )
+    league_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True, index=True)
     team_a: Mapped[str] = mapped_column(String(80), nullable=False)
     team_b: Mapped[str] = mapped_column(String(80), nullable=False)
     kickoff_time: Mapped[datetime] = mapped_column(

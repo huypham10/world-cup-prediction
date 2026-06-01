@@ -43,22 +43,23 @@ The task is also runnable as a CLI: `python -m app.tasks.poll_and_settle`.
 ## Local setup
 
 ```bash
-# 1. Clone and create virtual environment
-python3 -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
+# 1. Install dependencies
+make install
 
 # 2. Configure environment
 cp .env.example .env
-# Edit .env — fill in DATABASE_URL, SESSION_SECRET, TASK_SECRET, FOOTBALL_API_KEY
+# Edit .env — fill in DATABASE_URL (Neon dev branch), SESSION_SECRET, TASK_SECRET, FOOTBALL_API_KEY
 
 # 3. Run migrations
-alembic upgrade head
+make migrate
 
 # 4. Start the dev server
-uvicorn app.main:app --reload
+make run
 ```
 
 Visit `http://localhost:8000` → redirects to `/login`.
+
+Use a Neon **dev branch** for `DATABASE_URL` locally — keep the production (main) branch URL only on your hosting platform. See [Database environments](#database-environments).
 
 ## Environment variables
 
@@ -74,26 +75,41 @@ Visit `http://localhost:8000` → redirects to `/login`.
 
 For local development, copy `.env.example` to `.env` and fill in the values.
 
-## Running migrations
+## Database environments
+
+Use Neon's branching to keep local and production data separate:
+
+```
+Neon project
+├── main   ← production (hosting platform DATABASE_URL)
+└── dev    ← local development (local .env DATABASE_URL)
+```
+
+Create the `dev` branch in the Neon console (Branches → Create branch from main), then put its pooled connection string in your local `.env`.
+
+### Running migrations
 
 ```bash
-# Apply all pending migrations
-alembic upgrade head
+# Apply to dev (reads .env)
+make migrate
+
+# Apply to production once verified
+make migrate-prod PROD_DATABASE_URL="postgresql+psycopg2://...main-branch..."
 
 # Generate a new migration after changing a model
 alembic revision --autogenerate -m "describe_the_change"
 ```
 
-The `DATABASE_URL` must be set in the environment (`.env` is loaded automatically).  
-Alembic uses the sync `psycopg2` driver internally — it strips `+asyncpg` from the URL.
+Alembic uses the sync `psycopg2` driver internally — it strips `+asyncpg` from the URL automatically.
 
 ## Poll-and-settle task
 
-Each run does three things:
+Each run does two things:
 
-1. **Sync fixtures** — fetch upcoming matches from the football API and upsert into the `matches` table.
-2. **Lock predictions** — bulk-update `predictions.locked = True` for any match past kickoff.
-3. **Settle finished matches** — for each finished, unsettled match: create `settlements` rows for every group member who joined before kickoff. No prediction = automatic loss. Marks `match.settled = True` when done.
+1. **Sync fixtures** — fetch upcoming matches from the football API and upsert into the `matches` table. Also deletes unsettled matches from other leagues so switching `FOOTBALL_LEAGUE_ID` keeps the DB clean (settled matches are never deleted).
+2. **Settle finished matches** — for each finished, unsettled match: create `settlements` rows for every group member who joined before kickoff. No prediction = automatic loss. Marks `match.settled = True` when done.
+
+Prediction locking is enforced at the endpoint (`match.kickoff_time <= now`), not by this task.
 
 Running it manually:
 ```bash
@@ -107,7 +123,7 @@ curl -X POST http://localhost:8000/tasks/poll \
 # Returns 202 Accepted; task runs in the background
 ```
 
-## GitHub Actions cron (Step 6)
+## GitHub Actions cron
 
 The workflow at [.github/workflows/poll.yml](.github/workflows/poll.yml) POSTs to `/tasks/poll` every 20 minutes, which also wakes the web app if the hosting platform has scaled it to zero.
 
@@ -132,16 +148,28 @@ users           — name, pin_hash (bcrypt), failed_attempts, locked_until
 groups          — name, owner_id, join_code, stake
 memberships     — group_id, user_id, role (owner/member), joined_at
 matches         — team_a, team_b, kickoff_time, status, score_a, score_b, result, settled
-predictions     — user_id, match_id, pick (A/B/draw), locked
+                  league_id, round_number, round_name, group_name
+predictions     — user_id, match_id, pick (A/B/draw), locked, created_at, updated_at
 settlements     — group_id, user_id, match_id, correct, amount
 ```
 
 ## Auth
 
 - **Register**: name + 6-digit PIN → bcrypt hash stored, session cookie set.
-- **Login**: name + PIN → 5 failed attempts trigger a 15-minute lockout.
+- **Login**: name + PIN → 5 failed attempts per account trigger a 15-minute lockout.
+- **Rate limiting**: POST `/register` and POST `/login` are capped at 20 requests per hour per IP (slowapi).
 - **PIN reset**: the app admin (user ID = 1) can clear a user's PIN hash at `/admin`. The user is prompted to set a new PIN on their next login attempt.
 - **Session**: itsdangerous signed cookie, 60-day expiry, httponly + samesite=lax.
+
+## Make targets
+
+```bash
+make run            # start dev server with hot reload
+make migrate        # apply pending migrations (dev branch)
+make migrate-prod   # apply to production: PROD_DATABASE_URL=<url>
+make poll           # run poll-and-settle once (CLI)
+make install        # create .venv and install dependencies
+```
 
 ## Project layout
 
@@ -149,6 +177,7 @@ settlements     — group_id, user_id, match_id, correct, amount
 app/
 ├── auth/               # Session cookie, PIN service, FastAPI dependency
 ├── football_client/    # API client (swappable) + fixture sync
+├── limiter.py          # slowapi rate limiter (shared across routers)
 ├── models/             # SQLAlchemy models (one file per table)
 ├── routers/            # Route handlers: auth, groups, matches, admin, tasks
 ├── tasks/              # poll_and_settle.py — standalone, no web server dependency

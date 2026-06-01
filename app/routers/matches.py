@@ -43,6 +43,7 @@ async def matches_list(
     result = await db.execute(
         select(Match)
         .where(
+            Match.league_id == settings.FOOTBALL_LEAGUE_ID,
             Match.kickoff_time >= now - timedelta(hours=24),
             Match.kickoff_time <= now + timedelta(days=14),
         )
