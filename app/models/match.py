@@ -37,6 +37,10 @@ class Match(Base):
     result: Mapped[Optional[str]] = mapped_column(String(10), nullable=True)
     # True = settlement done; prevents double-settling
     settled: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, index=True)
+    # Round info from the football API
+    round_number: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    round_name: Mapped[Optional[str]] = mapped_column(String(80), nullable=True)
+    group_name: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
 
     # Relationships
     predictions: Mapped[List["Prediction"]] = relationship(back_populates="match")

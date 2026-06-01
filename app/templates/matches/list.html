@@ -23,13 +23,25 @@
     <p class="mt-2 text-sm">Click "Refresh fixtures" to fetch from the football API.</p>
   </div>
 {% else %}
-  {% set ns = namespace(current_date='') %}
+  {% set ns = namespace(current_group='') %}
   {% for item in matches %}
-    {% set match_date = item.match.kickoff_time.strftime('%Y-%m-%d') %}
-    {% if match_date != ns.current_date %}
-      {% set ns.current_date = match_date %}
-      <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wider mt-6 mb-3 first:mt-0">
-        {{ item.match.kickoff_time.strftime('%A, %d %B %Y') }}
+    {# Grouping key: (round_number, group_name) for group stage, round_number for knockout, date fallback #}
+    {% if item.match.round_number is not none %}
+      {% if item.match.round_number < 4 %}
+        {% set group_key = 'r' ~ item.match.round_number ~ '-' ~ item.match.group_name %}
+        {% set group_label = 'Round ' ~ item.match.round_number ~ ' · ' ~ item.match.group_name %}
+      {% else %}
+        {% set group_key = 'r' ~ item.match.round_number %}
+        {% set group_label = item.match.round_name %}
+      {% endif %}
+    {% else %}
+      {% set group_key = item.match.kickoff_time.strftime('%Y-%m-%d') %}
+      {% set group_label = item.match.kickoff_time.strftime('%d %B %Y') ~ ' (UTC)' %}
+    {% endif %}
+    {% if group_key != ns.current_group %}
+      {% set ns.current_group = group_key %}
+      <h2 class="text-sm font-semibold text-gray-400 uppercase tracking-wider mt-6 mb-3 first:mt-0">
+        {{ group_label }}
       </h2>
     {% endif %}
 
@@ -50,9 +62,10 @@
                 {{ item.match.score_a }} – {{ item.match.score_b }}
               </span>
             {% else %}
-              <span class="text-sm font-medium text-gray-500">
+              <time data-utc="{{ item.match.kickoff_time.isoformat() }}"
+                class="text-sm font-medium text-gray-500">
                 {{ item.match.kickoff_time.strftime('%H:%M') }} UTC
-              </span>
+              </time>
             {% endif %}
           </div>
           <div class="flex-1 pl-4">

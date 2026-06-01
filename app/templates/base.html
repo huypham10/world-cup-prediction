@@ -30,5 +30,25 @@
   <main class="max-w-2xl mx-auto mt-8 px-4 pb-16">
     {% block content %}{% endblock %}
   </main>
+  <script>
+    const _tz = new Intl.DateTimeFormat([], { timeZoneName: 'short' });
+    function tzAbbr(dt) {
+      return _tz.formatToParts(dt).find(p => p.type === 'timeZoneName')?.value ?? '';
+    }
+    function localizeTimes(root) {
+      (root || document).querySelectorAll('time[data-utc]').forEach(el => {
+        const dt = new Date(el.getAttribute('data-utc'));
+        if (el.dataset.format === 'date') {
+          el.textContent = dt.toLocaleString([], { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+        } else {
+          const time = dt.toLocaleString([], { hour: '2-digit', minute: '2-digit' });
+          const date = dt.toLocaleString([], { weekday: 'short', day: 'numeric', month: 'short' });
+          el.textContent = date + ' · ' + time + ' ' + tzAbbr(dt);
+        }
+      });
+    }
+    localizeTimes();
+    document.body.addEventListener('htmx:afterSwap', e => localizeTimes(e.detail.elt));
+  </script>
 </body>
 </html>

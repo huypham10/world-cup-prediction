@@ -3,12 +3,14 @@ Poll-and-settle task. Runs independently of the web server.
 
 Each run:
   1. Sync fixtures from the football API (fetch + upsert into matches table).
-  2. Lock predictions for all matches that have kicked off (bulk UPDATE).
-  3. For each finished, unsettled match that has a result:
+  2. For each finished, unsettled match that has a result:
      a. For every group: settle members who joined BEFORE kickoff.
         No prediction = automatic loss (forfeit). Uses INSERT ON CONFLICT DO NOTHING.
      b. Mark match.settled = True and commit.
-  4. Exit. Idempotent — re-running on the same data produces no duplicate rows.
+  3. Exit. Idempotent — re-running on the same data produces no duplicate rows.
+
+Prediction locking is NOT done here. The /matches/{id}/predict endpoint checks
+match.kickoff_time <= now on every request — that is the authoritative lock.
 
 CLI:  python -m app.tasks.poll_and_settle
 HTTP: POST /tasks/poll  (guarded by X-Task-Secret — see app/routers/tasks.py)
@@ -19,7 +21,7 @@ import asyncio
 import logging
 from datetime import datetime, timezone
 
-from sqlalchemy import select, update
+from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -42,22 +44,6 @@ def _make_client() -> BzzOiroClient:
         base_url=settings.FOOTBALL_API_BASE_URL,
         league_id=settings.FOOTBALL_LEAGUE_ID,
     )
-
-
-async def _lock_predictions(db: AsyncSession) -> int:
-    """Bulk-lock predictions for matches that have already kicked off."""
-    now = datetime.now(timezone.utc)
-    result = await db.execute(
-        update(Prediction)
-        .where(
-            Prediction.locked.is_(False),
-            Prediction.match_id.in_(
-                select(Match.id).where(Match.kickoff_time <= now)
-            ),
-        )
-        .values(locked=True)
-    )
-    return result.rowcount
 
 
 async def _settle_match(db: AsyncSession, match: Match) -> int:
@@ -125,13 +111,7 @@ async def run() -> None:
         new_fixtures = await sync_fixtures(db, client)
         logger.info("poll_and_settle: %d new fixtures synced", new_fixtures)
 
-        # 2. Lock predictions for started matches
-        locked = await _lock_predictions(db)
-        if locked:
-            await db.commit()
-            logger.info("poll_and_settle: locked %d predictions", locked)
-
-        # 3. Settle finished, unsettled matches
+        # 2. Settle finished, unsettled matches
         result = await db.execute(
             select(Match).where(
                 Match.status == "finished",

@@ -7,6 +7,7 @@ from ..auth import service as auth_svc
 from ..auth.dependencies import get_current_user
 from ..auth.session import make_session_cookie
 from ..database import get_db
+from ..limiter import limiter
 from ..models.user import User
 from ..templates import templates
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -41,6 +42,7 @@ async def register_page(
 
 
 @router.post("/register")
+@limiter.limit("20/hour")
 async def register(
     request: Request,
     name: str = Form(...),
@@ -86,6 +88,7 @@ async def login_page(
 
 
 @router.post("/login")
+@limiter.limit("20/hour")
 async def login(
     request: Request,
     name: str = Form(...),

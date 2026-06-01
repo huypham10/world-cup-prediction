@@ -4,7 +4,11 @@ import logging
 
 from fastapi import Depends, FastAPI
 from fastapi.responses import RedirectResponse
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
 from sqlalchemy import text
+
+from .limiter import limiter
 
 from .auth.dependencies import get_current_user
 from .database import AsyncSessionLocal, engine
@@ -33,6 +37,8 @@ app = FastAPI(
     lifespan=lifespan,
     debug=settings.DEBUG,
 )
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 app.include_router(auth_router.router)
 app.include_router(groups_router.router)

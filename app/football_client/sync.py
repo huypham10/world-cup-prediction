@@ -42,6 +42,9 @@ async def sync_fixtures(db: AsyncSession, client: FootballClientBase) -> int:
             match.status = f.status
             match.score_a = f.score_a
             match.score_b = f.score_b
+            match.round_number = f.round_number
+            match.round_name = f.round_name
+            match.group_name = f.group_name
             if f.status == "finished" and match.result is None:
                 match.result = _compute_result(f.score_a, f.score_b)
         else:
@@ -57,6 +60,9 @@ async def sync_fixtures(db: AsyncSession, client: FootballClientBase) -> int:
                     result=_compute_result(f.score_a, f.score_b)
                     if f.status == "finished"
                     else None,
+                    round_number=f.round_number,
+                    round_name=f.round_name,
+                    group_name=f.group_name,
                 )
             )
             new_count += 1

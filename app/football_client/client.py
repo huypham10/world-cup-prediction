@@ -20,6 +20,9 @@ class FixtureData:
     status: str           # "scheduled" | "live" | "finished" | "postponed"
     score_a: Optional[int] = None
     score_b: Optional[int] = None
+    round_number: Optional[int] = None
+    round_name: Optional[str] = None
+    group_name: Optional[str] = None
 
 
 class FootballClientBase(ABC):
@@ -67,10 +70,13 @@ class BzzOiroClient(FootballClientBase):
             external_id=str(event["id"]),
             team_a=home["name"] if isinstance(home, dict) else home,
             team_b=away["name"] if isinstance(away, dict) else away,
-            kickoff_time=_parse_dt(event["date"]),
+            kickoff_time=_parse_dt(event["event_date"]),
             status=_STATUS_MAP.get(event.get("status", ""), "postponed"),
             score_a=event.get("home_score"),
             score_b=event.get("away_score"),
+            round_number=event.get("round_number"),
+            round_name=event.get("round_name") or None,
+            group_name=event.get("group_name"),
         )
 
     async def fetch_upcoming_fixtures(self) -> list[FixtureData]:
