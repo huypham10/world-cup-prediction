@@ -11,7 +11,14 @@ jobs:
     timeout-minutes: 5
     steps:
       - name: Trigger poll-and-settle endpoint
+        env:
+          APP_URL: ${{ secrets.APP_URL }}
+          TASK_SECRET: ${{ secrets.TASK_SECRET }}
         run: |
+          if [ -z "$APP_URL" ]; then
+            echo "APP_URL secret not set — add it in Settings → Secrets → Actions once the app is deployed"
+            exit 0
+          fi
           curl --fail-with-body --max-time 30 -X POST \
-            -H "X-Task-Secret: ${{ secrets.TASK_SECRET }}" \
-            "${{ secrets.APP_URL }}/tasks/poll"
+            -H "X-Task-Secret: $TASK_SECRET" \
+            "$APP_URL/tasks/poll"
