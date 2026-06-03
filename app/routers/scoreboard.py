@@ -1,3 +1,5 @@
+from collections import defaultdict
+from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Optional
 
@@ -17,6 +19,10 @@ from ..models.user import User
 from ..templates import templates
 
 router = APIRouter()
+
+
+def _round_label(match: Match) -> str:
+    return match.round_name if match.round_name else "Group Stage"
 
 
 async def _require_member(db: AsyncSession, group_id: int, user_id: int) -> None:
@@ -57,51 +63,27 @@ async def scoreboard(
 
     # All members of this group, ordered by name
     members_result = await db.execute(
-        select(User, Membership.joined_at)
+        select(User)
         .join(Membership, Membership.user_id == User.id)
         .where(Membership.group_id == group_id)
         .order_by(User.name)
     )
-    members_rows = members_result.all()
-    members = [u for u, _ in members_rows]
+    members = members_result.scalars().all()
     member_ids = [u.id for u in members]
 
-    # Load ALL settlements for this group in one query
+    # All settlements for this group — single query
     all_settlements_result = await db.execute(
         select(Settlement).where(Settlement.group_id == group_id)
     )
     all_settlements = all_settlements_result.scalars().all()
 
-    # Index settlements by (match_id, user_id) and by user_id
-    by_user: dict[int, list[Settlement]] = {u.id: [] for u in members}
-    by_match_user: dict[tuple[int, int], Settlement] = {}
-    settled_match_ids: set[int] = set()
-    for s in all_settlements:
-        by_user.setdefault(s.user_id, []).append(s)
-        by_match_user[(s.match_id, s.user_id)] = s
-        settled_match_ids.add(s.match_id)
+    settled_match_ids = {s.match_id for s in all_settlements}
 
-    # Build standings (sorted by net desc, then correct desc)
-    standings = []
-    for user in members:
-        user_settlements = by_user.get(user.id, [])
-        correct = sum(1 for s in user_settlements if s.correct)
-        wrong = sum(1 for s in user_settlements if not s.correct)
-        net = sum(
-            (s.amount for s in user_settlements if s.amount is not None),
-            Decimal(0),
-        )
-        standings.append({
-            "user": user,
-            "correct": correct,
-            "wrong": wrong,
-            "played": len(user_settlements),
-            "net": net,
-        })
-    standings.sort(key=lambda x: (x["net"], x["correct"]), reverse=True)
-
-    # Load settled matches + all member predictions in two queries
+    # Load settled matches + predictions in two queries
+    matches_by_id: dict[int, Match] = {}
+    preds_by_match_user: dict[tuple[int, int], Prediction] = {}
     match_rows = []
+
     if settled_match_ids:
         matches_result = await db.execute(
             select(Match)
@@ -109,6 +91,7 @@ async def scoreboard(
             .order_by(Match.kickoff_time.desc())
         )
         settled_matches = matches_result.scalars().all()
+        matches_by_id = {m.id: m for m in settled_matches}
 
         preds_result = await db.execute(
             select(Prediction).where(
@@ -116,8 +99,13 @@ async def scoreboard(
                 Prediction.user_id.in_(member_ids),
             )
         )
-        preds_by_match_user: dict[tuple[int, int], Prediction] = {
+        preds_by_match_user = {
             (p.match_id, p.user_id): p for p in preds_result.scalars().all()
+        }
+
+        # Index settlements by (match_id, user_id) for match history
+        by_match_user: dict[tuple[int, int], Settlement] = {
+            (s.match_id, s.user_id): s for s in all_settlements
         }
 
         for match in settled_matches:
@@ -126,13 +114,9 @@ async def scoreboard(
                 s = by_match_user.get((match.id, user.id))
                 p = preds_by_match_user.get((match.id, user.id))
                 if s is None:
-                    # Joined after kickoff — not settled
                     member_results.append({
-                        "user": user,
-                        "pick": None,
-                        "correct": None,
-                        "amount": None,
-                        "eligible": False,
+                        "user": user, "pick": None,
+                        "correct": None, "amount": None, "eligible": False,
                     })
                 else:
                     member_results.append({
@@ -144,6 +128,51 @@ async def scoreboard(
                     })
             match_rows.append({"match": match, "member_results": member_results})
 
+    # Overall standings — aggregate across all settlements per user
+    by_user: dict[int, list[Settlement]] = {u.id: [] for u in members}
+    for s in all_settlements:
+        by_user.setdefault(s.user_id, []).append(s)
+
+    def _stats(settlements: list[Settlement]) -> dict:
+        correct = sum(1 for s in settlements if s.correct)
+        wrong = sum(1 for s in settlements if not s.correct)
+        net = sum((s.amount for s in settlements if s.amount is not None), Decimal(0))
+        return {"correct": correct, "wrong": wrong, "played": len(settlements), "net": net}
+
+    standings = sorted(
+        [{"user": u, **_stats(by_user.get(u.id, []))} for u in members],
+        key=lambda x: (x["net"], x["correct"]),
+        reverse=True,
+    )
+
+    # Round standings — group settlements by round, sorted most recent first
+    # max kickoff per round drives the sort order
+    round_kickoff: dict[str, datetime] = {}
+    round_settlements: dict[str, dict[int, list[Settlement]]] = defaultdict(
+        lambda: defaultdict(list)
+    )
+    for s in all_settlements:
+        match = matches_by_id.get(s.match_id)
+        if not match:
+            continue
+        label = _round_label(match)
+        round_settlements[label][s.user_id].append(s)
+        if label not in round_kickoff or match.kickoff_time > round_kickoff[label]:
+            round_kickoff[label] = match.kickoff_time
+
+    round_standings = []
+    for label in sorted(round_kickoff, key=lambda r: round_kickoff[r], reverse=True):
+        user_stats = sorted(
+            [
+                {"user": u, **_stats(round_settlements[label].get(u.id, []))}
+                for u in members
+                if round_settlements[label].get(u.id)  # only show eligible members
+            ],
+            key=lambda x: (x["net"], x["correct"]),
+            reverse=True,
+        )
+        round_standings.append({"label": label, "members": user_stats})
+
     return templates.TemplateResponse(
         "scoreboard/group.html",
         {
@@ -152,6 +181,7 @@ async def scoreboard(
             "group": group,
             "all_groups": all_groups,
             "standings": standings,
+            "round_standings": round_standings,
             "match_rows": match_rows,
             "members": members,
         },
