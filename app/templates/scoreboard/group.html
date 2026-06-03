@@ -24,13 +24,111 @@
   <div>
     <h1 class="text-2xl font-bold">{{ group.name }}</h1>
     <p class="text-sm text-gray-500 mt-1">
-      Stake: <span class="font-medium text-gray-700">{% if group.stake %}{{ group.stake }}{% else %}Free{% endif %}</span>
-      &nbsp;·&nbsp;
       Code: <span class="font-mono font-semibold text-gray-700">{{ group.join_code }}</span>
     </p>
   </div>
   <a href="/matches" class="text-sm text-green-600 hover:underline self-center">Matches →</a>
 </div>
+
+{# Owner-only: per-round wager settings #}
+{% if group.owner_id == current_user.id %}
+<div class="bg-white rounded-lg shadow overflow-hidden mb-6">
+  <div class="px-5 py-3 border-b bg-gray-50 flex items-center justify-between">
+    <h2 class="font-semibold text-gray-700 text-sm">Wager Settings</h2>
+    <span class="text-xs text-gray-400">Leave blank = free for that round</span>
+  </div>
+  <form id="wager-form-{{ group.id }}" method="post" action="/groups/{{ group.id }}/wagers">
+    <table class="w-full text-sm">
+      <thead class="text-xs uppercase tracking-wide text-gray-400 border-b">
+        <tr>
+          <th class="text-left px-5 py-2">Round</th>
+          <th class="text-center px-4 py-2">Win amount</th>
+          <th class="text-center px-4 py-2">Loss amount</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-100">
+        {% for round in tournament_rounds %}
+        {% set wager = wagers_by_round.get(round) %}
+        <tr>
+          <td class="px-5 py-2.5 font-medium text-gray-700">
+            <input type="hidden" name="round_name" value="{{ round }}">
+            {{ round }}
+          </td>
+          <td class="px-4 py-2.5 text-center">
+            <input type="text" name="win_amount"
+              value="{{ wager.win_amount if wager and wager.win_amount is not none else '' }}"
+              placeholder="—"
+              class="w-20 text-center border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-green-500">
+          </td>
+          <td class="px-4 py-2.5 text-center">
+            <input type="text" name="loss_amount"
+              value="{{ wager.loss_amount if wager and wager.loss_amount is not none else '' }}"
+              placeholder="—"
+              class="w-20 text-center border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-green-500">
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    <div class="px-5 py-3 border-t bg-gray-50">
+      <label class="flex items-center gap-2 text-sm text-gray-600 cursor-pointer select-none">
+        <input type="checkbox" name="late_join_counts_as_loss" value="1"
+          {% if group.late_join_counts_as_loss %}checked{% endif %}
+          class="rounded border-gray-300 text-green-600 focus:ring-green-500">
+        Count matches played before a member joined as a loss for them
+      </label>
+    </div>
+  </form>
+  <div class="px-5 py-3 border-t bg-gray-50 flex items-center justify-between">
+    <form method="post" action="/groups/{{ group.id }}/resettle"
+          onsubmit="return confirm('Re-settle all matches for this group using the current wagers? Existing settlements will be deleted.')">
+      <button type="submit"
+        class="text-sm text-red-500 hover:text-red-700 hover:underline">
+        Re-settle with current wagers
+      </button>
+    </form>
+    <button type="submit" form="wager-form-{{ group.id }}"
+      class="bg-green-600 text-white rounded px-4 py-1.5 text-sm hover:bg-green-700 transition-colors">
+      Save wagers
+    </button>
+  </div>
+</div>
+{% elif wagers_by_round %}
+{# Read-only wager info for non-owners #}
+<div class="bg-white rounded-lg shadow overflow-hidden mb-6">
+  <div class="px-5 py-3 border-b bg-gray-50 flex items-center justify-between">
+    <h2 class="font-semibold text-gray-700 text-sm">Wager Settings</h2>
+    {% if group.late_join_counts_as_loss %}
+      <span class="text-xs text-gray-500">Matches before joining count as a loss</span>
+    {% endif %}
+  </div>
+  <table class="w-full text-sm">
+    <thead class="text-xs uppercase tracking-wide text-gray-400 border-b">
+      <tr>
+        <th class="text-left px-5 py-2">Round</th>
+        <th class="text-center px-4 py-2">Win</th>
+        <th class="text-center px-4 py-2">Loss</th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-gray-100">
+      {% for round in tournament_rounds %}
+      {% set wager = wagers_by_round.get(round) %}
+      {% if wager and (wager.win_amount is not none or wager.loss_amount is not none) %}
+      <tr>
+        <td class="px-5 py-2 text-gray-700 font-medium">{{ round }}</td>
+        <td class="px-4 py-2 text-center font-mono text-green-600">
+          {{ wager.win_amount if wager.win_amount is not none else '—' }}
+        </td>
+        <td class="px-4 py-2 text-center font-mono text-red-400">
+          {{ wager.loss_amount if wager.loss_amount is not none else '—' }}
+        </td>
+      </tr>
+      {% endif %}
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
 
 {# Standings table #}
 <div class="bg-white rounded-lg shadow overflow-hidden mb-8">
@@ -46,7 +144,7 @@
         <th class="text-center px-3 py-3">Played</th>
         <th class="text-center px-3 py-3">Correct</th>
         <th class="text-center px-3 py-3">Wrong</th>
-        {% if group.stake %}
+        {% if wagers_by_round %}
         <th class="text-right px-5 py-3">Net</th>
         {% endif %}
       </tr>
@@ -76,7 +174,7 @@
             <span class="text-gray-300">0</span>
           {% endif %}
         </td>
-        {% if group.stake %}
+        {% if wagers_by_round %}
         <td class="px-5 py-3 text-right font-mono font-semibold
           {% if s.net > 0 %}text-green-600
           {% elif s.net < 0 %}text-red-500
@@ -93,14 +191,17 @@
   {% endif %}
 </div>
 
-{# Per-round standings #}
+{# Per-round standings — each round collapsible #}
 {% if round_standings %}
 <h2 class="font-semibold text-gray-700 mb-3 mt-8">By Round</h2>
 {% for round in round_standings %}
-<div class="bg-white rounded-lg shadow overflow-hidden mb-4">
-  <div class="px-5 py-2.5 border-b bg-gray-50">
-    <h3 class="text-sm font-semibold text-gray-600">{{ round.label }}</h3>
-  </div>
+<details class="bg-white rounded-lg shadow overflow-hidden mb-4">
+  <summary class="flex items-center gap-2 px-5 py-2.5 border-b bg-gray-50 cursor-pointer select-none list-none marker:content-none">
+    <svg class="w-3 h-3 flex-shrink-0 text-gray-400 transition-transform duration-150 [details[open]_&]:rotate-90" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"/>
+    </svg>
+    <span class="text-sm font-semibold text-gray-600">{{ round.label }}</span>
+  </summary>
   <table class="w-full text-sm">
     <thead class="text-xs uppercase tracking-wide text-gray-400 border-b">
       <tr>
@@ -109,7 +210,7 @@
         <th class="text-center px-3 py-2">Played</th>
         <th class="text-center px-3 py-2">Correct</th>
         <th class="text-center px-3 py-2">Wrong</th>
-        {% if group.stake %}
+        {% if wagers_by_round %}
         <th class="text-right px-5 py-2">Net</th>
         {% endif %}
       </tr>
@@ -131,7 +232,7 @@
           {% if s.wrong > 0 %}<span class="text-red-500">{{ s.wrong }}</span>
           {% else %}<span class="text-gray-300">0</span>{% endif %}
         </td>
-        {% if group.stake %}
+        {% if wagers_by_round %}
         <td class="px-5 py-2 text-right font-mono font-semibold
           {% if s.net > 0 %}text-green-600{% elif s.net < 0 %}text-red-500{% else %}text-gray-400{% endif %}">
           {% if s.net > 0 %}+{% endif %}{{ s.net }}
@@ -141,26 +242,30 @@
       {% endfor %}
     </tbody>
   </table>
-</div>
+</details>
 {% endfor %}
 {% endif %}
 
-{# Match history #}
+{# Match history — grouped by round, each round collapsible via <details> #}
 {% if match_rows %}
 <h2 class="font-semibold text-gray-700 mb-3">Match History</h2>
-<div class="space-y-3">
-  {% set ns = namespace(current_round='') %}
-  {% for row in match_rows %}
-  {% set match = row.match %}
-  {% set round_label = match.round_name if match.round_name else 'Group Stage' %}
-  {% if round_label != ns.current_round %}
-    {% set ns.current_round = round_label %}
-    <h3 class="text-xs font-semibold text-gray-400 uppercase tracking-wider pt-3 first:pt-0">
-      {{ round_label }}
-    </h3>
-  {% endif %}
+{% set ns = namespace(current_round='') %}
+{% for row in match_rows %}
+{% set match = row.match %}
+{% set round_label = match.round_name if match.round_name else 'Group Stage' %}
+{% if round_label != ns.current_round %}
+  {% if ns.current_round %}</div></details>{% endif %}
+  {% set ns.current_round = round_label %}
+  <details class="mb-4">
+  <summary class="flex items-center gap-2 text-xs font-semibold text-gray-400 uppercase tracking-wider cursor-pointer select-none py-1 marker:content-none list-none">
+    <svg class="w-3 h-3 flex-shrink-0 transition-transform duration-150 [details[open]_&]:rotate-90" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"/>
+    </svg>
+    {{ round_label }}
+  </summary>
+  <div class="space-y-3 mt-2">
+{% endif %}
   <div class="bg-white rounded-lg shadow overflow-hidden">
-    {# Match result header #}
     <div class="px-5 py-3 border-b flex items-center justify-between">
       <div class="flex items-center gap-3">
         <span class="font-semibold text-gray-800">{{ match.team_a }}</span>
@@ -171,7 +276,6 @@
         <time data-utc="{{ match.kickoff_time.isoformat() }}" data-format="date">
           {{ match.kickoff_time.strftime('%d %b %Y') }}
         </time>
-        {# Result badge #}
         <span class="px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 font-medium">
           {% if match.result == 'A' %}{{ match.team_a }} win
           {% elif match.result == 'B' %}{{ match.team_b }} win
@@ -179,40 +283,30 @@
         </span>
       </div>
     </div>
-
-    {# Per-member picks #}
     <div class="divide-y divide-gray-50">
       {% for mr in row.member_results %}
       <div class="px-5 py-2.5 flex items-center justify-between text-sm">
         <span class="text-gray-700 font-medium w-32 truncate">
           {{ mr.user.name }}
-          {% if mr.user.id == current_user.id %}
-            <span class="text-xs text-gray-400 font-normal">(you)</span>
-          {% endif %}
+          {% if mr.user.id == current_user.id %}<span class="text-xs text-gray-400 font-normal">(you)</span>{% endif %}
         </span>
-
         {% if not mr.eligible %}
           <span class="text-xs text-gray-300 italic">Joined after kickoff</span>
         {% else %}
           <div class="flex items-center gap-3">
-            {# Pick #}
             <span class="text-gray-500">
               {% if mr.pick == 'A' %}{{ match.team_a }} win
               {% elif mr.pick == 'B' %}{{ match.team_b }} win
               {% elif mr.pick == 'draw' %}Draw
-              {% else %}<span class="italic text-gray-300">No prediction</span>
-              {% endif %}
+              {% else %}<span class="italic text-gray-300">No prediction</span>{% endif %}
             </span>
-            {# Outcome #}
             {% if mr.correct %}
               <span class="text-green-600 font-semibold text-xs">✓ Correct</span>
             {% else %}
               <span class="text-red-400 text-xs">✗ Wrong</span>
             {% endif %}
-            {# Amount #}
             {% if mr.amount is not none %}
-              <span class="font-mono text-xs font-semibold w-12 text-right
-                {% if mr.amount > 0 %}text-green-600{% else %}text-red-400{% endif %}">
+              <span class="font-mono text-xs font-semibold w-12 text-right {% if mr.amount > 0 %}text-green-600{% else %}text-red-400{% endif %}">
                 {% if mr.amount > 0 %}+{% endif %}{{ mr.amount }}
               </span>
             {% endif %}
@@ -222,8 +316,8 @@
       {% endfor %}
     </div>
   </div>
-  {% endfor %}
-</div>
+{% endfor %}
+{% if ns.current_round %}</div></details>{% endif %}
 {% endif %}
 
 {% endblock %}

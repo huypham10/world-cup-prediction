@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..auth.dependencies import get_current_user
 from ..database import get_db
 from ..models.group import Group
+from ..models.group_wager import GroupWager, TOURNAMENT_ROUNDS
 from ..models.match import Match
 from ..models.membership import Membership
 from ..models.prediction import Prediction
@@ -173,6 +174,14 @@ async def scoreboard(
         )
         round_standings.append({"label": label, "members": user_stats})
 
+    # Load existing wagers for this group (for owner UI)
+    wagers_result = await db.execute(
+        select(GroupWager).where(GroupWager.group_id == group_id)
+    )
+    wagers_by_round: dict[str, GroupWager] = {
+        w.round_name: w for w in wagers_result.scalars().all()
+    }
+
     return templates.TemplateResponse(
         "scoreboard/group.html",
         {
@@ -184,5 +193,7 @@ async def scoreboard(
             "round_standings": round_standings,
             "match_rows": match_rows,
             "members": members,
+            "tournament_rounds": TOURNAMENT_ROUNDS,
+            "wagers_by_round": wagers_by_round,
         },
     )

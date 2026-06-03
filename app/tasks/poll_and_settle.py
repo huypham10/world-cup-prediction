@@ -4,8 +4,9 @@ Poll-and-settle task. Runs independently of the web server.
 Each run:
   1. Sync fixtures from the football API (fetch + upsert into matches table).
   2. For each finished, unsettled match that has a result:
-     a. For every group: settle members who joined BEFORE kickoff.
-        No prediction = automatic loss (forfeit). Uses INSERT ON CONFLICT DO NOTHING.
+     a. For every group: settle members who joined BEFORE kickoff using the
+        group's per-round wager (win_amount / loss_amount). No wager = NULL amount.
+        No prediction = automatic loss. Uses INSERT ON CONFLICT DO NOTHING.
      b. Mark match.settled = True and commit.
   3. Exit. Idempotent — re-running on the same data produces no duplicate rows.
 
@@ -20,6 +21,8 @@ from __future__ import annotations
 import asyncio
 import logging
 from datetime import datetime, timezone
+from decimal import Decimal
+from typing import Optional
 
 from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
@@ -30,6 +33,7 @@ from app.database import AsyncSessionLocal
 from app.football_client.client import BzzOiroClient
 from app.football_client.sync import sync_fixtures
 from app.models.group import Group
+from app.models.group_wager import GroupWager
 from app.models.match import Match
 from app.models.membership import Membership
 from app.models.prediction import Prediction
@@ -46,26 +50,46 @@ def _make_client() -> BzzOiroClient:
     )
 
 
-async def _settle_match(db: AsyncSession, match: Match) -> int:
+def _round_label(match: Match) -> str:
+    return match.round_name if match.round_name else "Group Stage"
+
+
+def _wager_amount(
+    wager: Optional[GroupWager], correct: bool
+) -> Optional[Decimal]:
+    if wager is None:
+        return None
+    if correct:
+        return wager.win_amount
+    return -wager.loss_amount if wager.loss_amount is not None else None
+
+
+async def _settle_match(
+    db: AsyncSession,
+    match: Match,
+    wagers_by_group_round: dict[tuple[int, str], GroupWager],
+) -> int:
     """
     Create Settlement rows for every eligible group member for one finished match.
     Eligible = membership.joined_at < match.kickoff_time.
     Returns the number of new rows inserted (0 if already settled).
     """
     now = datetime.now(timezone.utc)
+    round_label = _round_label(match)
     created = 0
 
     groups_result = await db.execute(select(Group))
     groups = groups_result.scalars().all()
 
     for group in groups:
-        # Only members who joined before kickoff are eligible
-        members_result = await db.execute(
-            select(Membership).where(
-                Membership.group_id == group.id,
-                Membership.joined_at < match.kickoff_time,
+        wager = wagers_by_group_round.get((group.id, round_label))
+
+        member_query = select(Membership).where(Membership.group_id == group.id)
+        if not group.late_join_counts_as_loss:
+            member_query = member_query.where(
+                Membership.joined_at < match.kickoff_time
             )
-        )
+        members_result = await db.execute(member_query)
         members = members_result.scalars().all()
 
         for member in members:
@@ -77,12 +101,8 @@ async def _settle_match(db: AsyncSession, match: Match) -> int:
             )
             prediction = pred_result.scalar_one_or_none()
 
-            # No prediction = automatic forfeit
             correct = prediction is not None and prediction.pick == match.result
-
-            amount = None
-            if group.stake is not None:
-                amount = group.stake if correct else -group.stake
+            amount = _wager_amount(wager, correct)
 
             stmt = (
                 pg_insert(Settlement)
@@ -102,37 +122,41 @@ async def _settle_match(db: AsyncSession, match: Match) -> int:
     return created
 
 
+async def settle(db: AsyncSession) -> None:
+    """Run settlement only — no fixture sync. Used by resettle and called from run()."""
+    wagers_result = await db.execute(select(GroupWager))
+    wagers_by_group_round: dict[tuple[int, str], GroupWager] = {
+        (w.group_id, w.round_name): w for w in wagers_result.scalars().all()
+    }
+
+    result = await db.execute(
+        select(Match).where(
+            Match.status == "finished",
+            Match.settled.is_(False),
+            Match.result.is_not(None),
+        )
+    )
+    unsettled = result.scalars().all()
+    logger.info("settle: %d matches to settle", len(unsettled))
+
+    for match in unsettled:
+        count = await _settle_match(db, match, wagers_by_group_round)
+        match.settled = True
+        await db.commit()
+        logger.info(
+            "settle: %s vs %s (match %s) — %d rows",
+            match.team_a, match.team_b, match.id, count,
+        )
+
+
 async def run() -> None:
     logger.info("poll_and_settle: starting")
 
     async with AsyncSessionLocal() as db:
-        # 1. Sync fixtures
         client = _make_client()
         new_fixtures = await sync_fixtures(db, client)
         logger.info("poll_and_settle: %d new fixtures synced", new_fixtures)
-
-        # 2. Settle finished, unsettled matches
-        result = await db.execute(
-            select(Match).where(
-                Match.status == "finished",
-                Match.settled.is_(False),
-                Match.result.is_not(None),
-            )
-        )
-        unsettled = result.scalars().all()
-        logger.info("poll_and_settle: %d matches to settle", len(unsettled))
-
-        for match in unsettled:
-            count = await _settle_match(db, match)
-            match.settled = True
-            await db.commit()
-            logger.info(
-                "poll_and_settle: settled %s vs %s (match %s) — %d settlement rows",
-                match.team_a,
-                match.team_b,
-                match.id,
-                count,
-            )
+        await settle(db)
 
     logger.info("poll_and_settle: done")
 
