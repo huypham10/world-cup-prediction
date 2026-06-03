@@ -90,7 +90,7 @@ async def sync_matches(
     """Manually trigger a fixture fetch from the football API. Redirects back to /matches."""
     if not current_user:
         return RedirectResponse("/login", status_code=302)
-    count = await sync_fixtures(db, _get_client(), settings.ROUND_DATE_RULES or None)
+    count = await sync_fixtures(db, _get_client(), settings.round_date_rules or None)
     return RedirectResponse(f"/matches?synced={count}", status_code=302)
 
 

@@ -13,15 +13,13 @@
 {% else %}
   {% set ns = namespace(current_group='') %}
   {% for item in matches %}
-    {# Grouping key: (round_number, group_name) for group stage, round_number for knockout, date fallback #}
-    {% if item.match.round_number is not none %}
-      {% if item.match.round_number < 4 %}
-        {% set group_key = 'r' ~ item.match.round_number ~ '-' ~ item.match.group_name %}
-        {% set group_label = 'Round ' ~ item.match.round_number ~ ' · ' ~ item.match.group_name %}
-      {% else %}
-        {% set group_key = 'r' ~ item.match.round_number %}
-        {% set group_label = item.match.round_name %}
-      {% endif %}
+    {# Grouping: WC group stage → "Round N · Group X", WC knockout / rule-assigned → round_name, fallback → UTC date #}
+    {% if item.match.round_number is not none and item.match.round_number < 4 %}
+      {% set group_key = 'r' ~ item.match.round_number ~ '-' ~ item.match.group_name %}
+      {% set group_label = 'Round ' ~ item.match.round_number ~ ' · ' ~ item.match.group_name %}
+    {% elif item.match.round_name %}
+      {% set group_key = 'rn-' ~ item.match.round_name %}
+      {% set group_label = item.match.round_name %}
     {% else %}
       {% set group_key = item.match.kickoff_time.strftime('%Y-%m-%d') %}
       {% set group_label = item.match.kickoff_time.strftime('%d %B %Y') ~ ' (UTC)' %}
