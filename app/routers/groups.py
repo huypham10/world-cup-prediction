@@ -232,3 +232,34 @@ async def resettle(
         await settle(fresh_db)
 
     return RedirectResponse(f"/groups/{group_id}/scoreboard", status_code=302)
+
+
+@router.post("/groups/{group_id}/members/{user_id}/remove")
+async def remove_member(
+    group_id: int,
+    user_id: int,
+    current_user: Optional[User] = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    if not current_user:
+        return RedirectResponse("/login", status_code=302)
+
+    # Only the group owner can remove members
+    result = await db.execute(
+        select(Group).where(Group.id == group_id, Group.owner_id == current_user.id)
+    )
+    if not result.scalar_one_or_none():
+        return RedirectResponse(f"/groups/{group_id}/scoreboard", status_code=302)
+
+    # Can't remove yourself (owner)
+    if user_id == current_user.id:
+        return RedirectResponse(f"/groups/{group_id}/scoreboard", status_code=302)
+
+    await db.execute(
+        delete(Membership).where(
+            Membership.group_id == group_id,
+            Membership.user_id == user_id,
+        )
+    )
+    await db.commit()
+    return RedirectResponse(f"/groups/{group_id}/scoreboard", status_code=302)

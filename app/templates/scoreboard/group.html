@@ -147,6 +147,9 @@
         {% if wagers_by_round %}
         <th class="text-right px-5 py-3">Net</th>
         {% endif %}
+        {% if group.owner_id == current_user.id %}
+        <th class="px-3 py-3"></th>
+        {% endif %}
       </tr>
     </thead>
     <tbody class="divide-y divide-gray-100">
@@ -180,6 +183,18 @@
           {% elif s.net < 0 %}text-red-500
           {% else %}text-gray-400{% endif %}">
           {% if s.net > 0 %}+{% endif %}{{ s.net }}
+        </td>
+        {% endif %}
+        {% if group.owner_id == current_user.id %}
+        <td class="px-3 py-3 text-center">
+          {% if s.user.id != current_user.id %}
+          <form method="post" action="/groups/{{ group.id }}/members/{{ s.user.id }}/remove"
+                onsubmit="return confirm('Remove {{ s.user.name }} from this group?')">
+            <button type="submit" class="text-red-400 hover:text-red-600 text-xs hover:underline">
+              Remove
+            </button>
+          </form>
+          {% endif %}
         </td>
         {% endif %}
       </tr>
