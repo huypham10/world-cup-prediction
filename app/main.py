@@ -19,6 +19,7 @@ from .routers import auth as auth_router
 from .routers import groups as groups_router
 from .routers import admin as admin_router
 from .routers import matches as matches_router
+from .routers import scoreboard as scoreboard_router
 from .routers import tasks as tasks_router
 
 logger = logging.getLogger(__name__)
@@ -56,6 +57,7 @@ app.include_router(auth_router.router)
 app.include_router(groups_router.router)
 app.include_router(admin_router.router)
 app.include_router(matches_router.router)
+app.include_router(scoreboard_router.router)
 app.include_router(tasks_router.router)
 
 

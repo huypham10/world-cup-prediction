@@ -1,21 +1,9 @@
 {% extends "base.html" %}
 {% block title %}Matches — World Cup Pool{% endblock %}
 {% block content %}
-<div class="flex items-center justify-between mb-6">
+<div class="mb-6">
   <h1 class="text-2xl font-bold">Matches</h1>
-  <form method="post" action="/matches/sync">
-    <button type="submit"
-      class="bg-white border border-gray-300 rounded px-3 py-1.5 text-sm hover:bg-gray-50 transition-colors">
-      Refresh fixtures
-    </button>
-  </form>
 </div>
-
-{% if synced is not none %}
-  <p class="mb-4 text-sm text-green-700 bg-green-50 rounded px-3 py-2">
-    Synced {{ synced }} new fixture{{ 's' if synced != 1 else '' }} from the API.
-  </p>
-{% endif %}
 
 {% if not matches %}
   <div class="text-center py-16 text-gray-500">

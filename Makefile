@@ -1,4 +1,4 @@
-.PHONY: run migrate migrate-prod poll install
+.PHONY: run migrate migrate-prod poll sync install
 
 run:
 	.venv/bin/uvicorn app.main:app --reload
@@ -12,6 +12,9 @@ migrate-prod:
 
 poll:
 	set -a && source .env && set +a && .venv/bin/python -m app.tasks.poll_and_settle
+
+sync:
+	set -a && source .env && set +a && .venv/bin/python -m app.tasks.sync_fixtures_cli
 
 install:
 	python3 -m venv .venv && .venv/bin/pip install -r requirements.txt

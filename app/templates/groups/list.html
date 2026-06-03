@@ -17,12 +17,18 @@
 {% if groups %}
   <div class="space-y-3">
     {% for group in groups %}
-      <div class="bg-white rounded-lg shadow p-5">
-        <h2 class="font-semibold text-lg">{{ group.name }}</h2>
-        <div class="flex gap-4 mt-1 text-sm text-gray-500">
-          <span>Stake: <span class="font-medium text-gray-700">{% if group.stake %}{{ group.stake }}{% else %}Free{% endif %}</span></span>
-          <span>Code: <span class="font-mono font-semibold text-gray-800">{{ group.join_code }}</span></span>
+      <div class="bg-white rounded-lg shadow p-5 flex items-center justify-between">
+        <div>
+          <h2 class="font-semibold text-lg">{{ group.name }}</h2>
+          <div class="flex gap-4 mt-1 text-sm text-gray-500">
+            <span>Stake: <span class="font-medium text-gray-700">{% if group.stake %}{{ group.stake }}{% else %}Free{% endif %}</span></span>
+            <span>Code: <span class="font-mono font-semibold text-gray-800">{{ group.join_code }}</span></span>
+          </div>
         </div>
+        <a href="/groups/{{ group.id }}/scoreboard"
+           class="text-sm text-green-600 hover:underline font-medium whitespace-nowrap">
+          Scoreboard →
+        </a>
       </div>
     {% endfor %}
   </div>

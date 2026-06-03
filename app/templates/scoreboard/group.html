@@ -1,0 +1,169 @@
+{% extends "base.html" %}
+{% block title %}{{ group.name }} — Scoreboard{% endblock %}
+{% block content %}
+
+{# Group switcher #}
+{% if all_groups|length > 1 %}
+<div class="flex gap-2 flex-wrap mb-6">
+  {% for g in all_groups %}
+    <a href="/groups/{{ g.id }}/scoreboard"
+       class="px-3 py-1.5 rounded-full text-sm font-medium transition-colors
+         {% if g.id == group.id %}
+           bg-green-600 text-white
+         {% else %}
+           bg-white border border-gray-300 text-gray-600 hover:bg-gray-50
+         {% endif %}">
+      {{ g.name }}
+    </a>
+  {% endfor %}
+</div>
+{% endif %}
+
+{# Group header #}
+<div class="flex items-start justify-between mb-6">
+  <div>
+    <h1 class="text-2xl font-bold">{{ group.name }}</h1>
+    <p class="text-sm text-gray-500 mt-1">
+      Stake: <span class="font-medium text-gray-700">{% if group.stake %}{{ group.stake }}{% else %}Free{% endif %}</span>
+      &nbsp;·&nbsp;
+      Code: <span class="font-mono font-semibold text-gray-700">{{ group.join_code }}</span>
+    </p>
+  </div>
+  <a href="/matches" class="text-sm text-green-600 hover:underline self-center">Matches →</a>
+</div>
+
+{# Standings table #}
+<div class="bg-white rounded-lg shadow overflow-hidden mb-8">
+  <div class="px-5 py-3 border-b bg-gray-50">
+    <h2 class="font-semibold text-gray-700">Standings</h2>
+  </div>
+  {% if standings %}
+  <table class="w-full text-sm">
+    <thead class="text-xs uppercase tracking-wide text-gray-400 border-b">
+      <tr>
+        <th class="text-left px-5 py-3 w-8">#</th>
+        <th class="text-left px-5 py-3">Player</th>
+        <th class="text-center px-3 py-3">Played</th>
+        <th class="text-center px-3 py-3">Correct</th>
+        <th class="text-center px-3 py-3">Wrong</th>
+        {% if group.stake %}
+        <th class="text-right px-5 py-3">Net</th>
+        {% endif %}
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-gray-100">
+      {% for s in standings %}
+      <tr class="{% if s.user.id == current_user.id %}bg-green-50{% else %}hover:bg-gray-50{% endif %}">
+        <td class="px-5 py-3 text-gray-400 font-mono">{{ loop.index }}</td>
+        <td class="px-5 py-3 font-medium">
+          {{ s.user.name }}
+          {% if s.user.id == current_user.id %}
+            <span class="text-xs text-gray-400 font-normal ml-1">(you)</span>
+          {% endif %}
+        </td>
+        <td class="px-3 py-3 text-center text-gray-500">{{ s.played }}</td>
+        <td class="px-3 py-3 text-center">
+          {% if s.correct > 0 %}
+            <span class="text-green-600 font-semibold">{{ s.correct }}</span>
+          {% else %}
+            <span class="text-gray-300">0</span>
+          {% endif %}
+        </td>
+        <td class="px-3 py-3 text-center">
+          {% if s.wrong > 0 %}
+            <span class="text-red-500">{{ s.wrong }}</span>
+          {% else %}
+            <span class="text-gray-300">0</span>
+          {% endif %}
+        </td>
+        {% if group.stake %}
+        <td class="px-5 py-3 text-right font-mono font-semibold
+          {% if s.net > 0 %}text-green-600
+          {% elif s.net < 0 %}text-red-500
+          {% else %}text-gray-400{% endif %}">
+          {% if s.net > 0 %}+{% endif %}{{ s.net }}
+        </td>
+        {% endif %}
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="px-5 py-8 text-center text-gray-400 text-sm">No matches settled yet.</p>
+  {% endif %}
+</div>
+
+{# Match history #}
+{% if match_rows %}
+<h2 class="font-semibold text-gray-700 mb-3">Match History</h2>
+<div class="space-y-3">
+  {% for row in match_rows %}
+  {% set match = row.match %}
+  <div class="bg-white rounded-lg shadow overflow-hidden">
+    {# Match result header #}
+    <div class="px-5 py-3 border-b flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <span class="font-semibold text-gray-800">{{ match.team_a }}</span>
+        <span class="font-bold tabular-nums text-gray-700">{{ match.score_a }} – {{ match.score_b }}</span>
+        <span class="font-semibold text-gray-800">{{ match.team_b }}</span>
+      </div>
+      <div class="flex items-center gap-2 text-xs text-gray-400">
+        <time data-utc="{{ match.kickoff_time.isoformat() }}" data-format="date">
+          {{ match.kickoff_time.strftime('%d %b %Y') }}
+        </time>
+        {# Result badge #}
+        <span class="px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 font-medium">
+          {% if match.result == 'A' %}{{ match.team_a }} win
+          {% elif match.result == 'B' %}{{ match.team_b }} win
+          {% else %}Draw{% endif %}
+        </span>
+      </div>
+    </div>
+
+    {# Per-member picks #}
+    <div class="divide-y divide-gray-50">
+      {% for mr in row.member_results %}
+      <div class="px-5 py-2.5 flex items-center justify-between text-sm">
+        <span class="text-gray-700 font-medium w-32 truncate">
+          {{ mr.user.name }}
+          {% if mr.user.id == current_user.id %}
+            <span class="text-xs text-gray-400 font-normal">(you)</span>
+          {% endif %}
+        </span>
+
+        {% if not mr.eligible %}
+          <span class="text-xs text-gray-300 italic">Joined after kickoff</span>
+        {% else %}
+          <div class="flex items-center gap-3">
+            {# Pick #}
+            <span class="text-gray-500">
+              {% if mr.pick == 'A' %}{{ match.team_a }} win
+              {% elif mr.pick == 'B' %}{{ match.team_b }} win
+              {% elif mr.pick == 'draw' %}Draw
+              {% else %}<span class="italic text-gray-300">No prediction</span>
+              {% endif %}
+            </span>
+            {# Outcome #}
+            {% if mr.correct %}
+              <span class="text-green-600 font-semibold text-xs">✓ Correct</span>
+            {% else %}
+              <span class="text-red-400 text-xs">✗ Wrong</span>
+            {% endif %}
+            {# Amount #}
+            {% if mr.amount is not none %}
+              <span class="font-mono text-xs font-semibold w-12 text-right
+                {% if mr.amount > 0 %}text-green-600{% else %}text-red-400{% endif %}">
+                {% if mr.amount > 0 %}+{% endif %}{{ mr.amount }}
+              </span>
+            {% endif %}
+          </div>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+{% endblock %}
