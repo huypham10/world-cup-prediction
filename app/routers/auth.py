@@ -35,7 +35,7 @@ async def register_page(
     request: Request, current_user: Optional[User] = Depends(get_current_user)
 ):
     if current_user:
-        return RedirectResponse("/groups", status_code=302)
+        return RedirectResponse("/matches", status_code=302)
     return templates.TemplateResponse(
         "auth/register.html", {"request": request, "current_user": None}
     )
@@ -52,7 +52,7 @@ async def register(
     current_user: Optional[User] = Depends(get_current_user),
 ):
     if current_user:
-        return RedirectResponse("/groups", status_code=302)
+        return RedirectResponse("/matches", status_code=302)
 
     errors = []
     if not name.strip():
@@ -67,7 +67,7 @@ async def register(
         if err:
             errors.append(err)
         else:
-            return _login_response("/groups", user.id)
+            return _login_response("/matches", user.id)
 
     return templates.TemplateResponse(
         "auth/register.html",
@@ -81,7 +81,7 @@ async def login_page(
     request: Request, current_user: Optional[User] = Depends(get_current_user)
 ):
     if current_user:
-        return RedirectResponse("/groups", status_code=302)
+        return RedirectResponse("/matches", status_code=302)
     return templates.TemplateResponse(
         "auth/login.html", {"request": request, "current_user": None}
     )
@@ -97,7 +97,7 @@ async def login(
     current_user: Optional[User] = Depends(get_current_user),
 ):
     if current_user:
-        return RedirectResponse("/groups", status_code=302)
+        return RedirectResponse("/matches", status_code=302)
 
     user, error, needs_reset = await auth_svc.attempt_login(db, name.strip(), pin)
 
@@ -112,7 +112,7 @@ async def login(
             status_code=422,
         )
 
-    return _login_response("/groups", user.id)
+    return _login_response("/matches", user.id)
 
 
 @router.get("/set-pin")
@@ -143,7 +143,7 @@ async def set_pin(
         if err:
             errors.append(err)
         else:
-            return _login_response("/groups", user.id)
+            return _login_response("/matches", user.id)
 
     return templates.TemplateResponse(
         "auth/set_pin.html",

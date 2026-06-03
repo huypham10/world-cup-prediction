@@ -26,7 +26,7 @@ async def admin_panel(
     db: AsyncSession = Depends(get_db),
 ):
     if not _require_admin(current_user):
-        return RedirectResponse("/groups" if current_user else "/login", status_code=302)
+        return RedirectResponse("/matches" if current_user else "/login", status_code=302)
     result = await db.execute(select(User).order_by(User.id))
     users = result.scalars().all()
     return templates.TemplateResponse(
@@ -42,6 +42,6 @@ async def admin_reset_pin(
     db: AsyncSession = Depends(get_db),
 ):
     if not _require_admin(current_user):
-        return RedirectResponse("/groups" if current_user else "/login", status_code=302)
+        return RedirectResponse("/matches" if current_user else "/login", status_code=302)
     await auth_svc.admin_reset_pin(db, user_id)
     return RedirectResponse("/admin", status_code=302)

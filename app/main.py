@@ -64,7 +64,7 @@ app.include_router(tasks_router.router)
 @app.get("/")
 async def home(current_user: Optional[User] = Depends(get_current_user)):
     if current_user:
-        return RedirectResponse("/groups", status_code=302)
+        return RedirectResponse("/matches", status_code=302)
     return RedirectResponse("/login", status_code=302)
 
 
