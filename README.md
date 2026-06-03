@@ -72,6 +72,7 @@ Use a Neon **dev branch** for `DATABASE_URL` locally — keep the production (ma
 | `FOOTBALL_API_KEY` | Yes | API key from [sports.bzzoiro.com](https://sports.bzzoiro.com) |
 | `FOOTBALL_API_BASE_URL` | No | Defaults to `https://sports.bzzoiro.com/api/v2` |
 | `FOOTBALL_LEAGUE_ID` | No | Defaults to `27` (World Cup). Change to test with another league. |
+| `ROUND_DATE_RULES` | No | Staging only — see [Staging environment](#staging-environment). |
 | `DEBUG` | No | Set `true` to enable SQL query logging |
 
 For local development, copy `.env.example` to `.env` and fill in the values.
@@ -87,6 +88,20 @@ Neon project
 ```
 
 Create the `dev` branch in the Neon console (Branches → Create branch from main), then put its pooled connection string in your local `.env`.
+
+### Staging environment
+
+For end-to-end testing with a live active league before the World Cup starts, add a `staging` Neon branch and point a staging deployment at it with a different `FOOTBALL_LEAGUE_ID`.
+
+Many active leagues return `round_name=""` for all fixtures. Use `ROUND_DATE_RULES` to assign round names by date range so per-round wager settlement can be tested properly:
+
+```
+# staging .env
+FOOTBALL_LEAGUE_ID=31   # or whichever active league you're testing with
+ROUND_DATE_RULES=[{"from":"2026-06-01","to":"2026-06-07","name":"Group Stage"},{"from":"2026-06-08","to":"2026-06-09","name":"Round of 16"},{"from":"2026-06-10","to":"2026-06-10","name":"Quarterfinals"},{"from":"2026-06-11","to":"2026-06-11","name":"Semifinals"},{"from":"2026-06-12","to":"2026-06-12","name":"Final"}]
+```
+
+Rules are applied during fixture sync when the API returns an empty `round_name`. Adjust the date ranges to match the test league's actual schedule. Leave `ROUND_DATE_RULES` unset in production — the World Cup API provides its own round names.
 
 ### Running migrations
 

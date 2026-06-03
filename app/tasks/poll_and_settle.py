@@ -154,7 +154,7 @@ async def run() -> None:
 
     async with AsyncSessionLocal() as db:
         client = _make_client()
-        new_fixtures = await sync_fixtures(db, client)
+        new_fixtures = await sync_fixtures(db, client, settings.ROUND_DATE_RULES or None)
         logger.info("poll_and_settle: %d new fixtures synced", new_fixtures)
         await settle(db)
 

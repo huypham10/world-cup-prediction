@@ -17,7 +17,7 @@ async def run() -> None:
             base_url=settings.FOOTBALL_API_BASE_URL,
             league_id=settings.FOOTBALL_LEAGUE_ID,
         )
-        count = await sync_fixtures(db, client)
+        count = await sync_fixtures(db, client, settings.ROUND_DATE_RULES or None)
         logger.info("sync: %d new fixtures added (league %d)", count, settings.FOOTBALL_LEAGUE_ID)
 
 

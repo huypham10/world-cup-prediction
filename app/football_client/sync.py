@@ -4,6 +4,7 @@ Called by both the web sync endpoint and the poll-and-settle task.
 """
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Optional
 
 from sqlalchemy import delete, select
@@ -23,18 +24,47 @@ def _compute_result(score_a: Optional[int], score_b: Optional[int]) -> Optional[
     return "draw"
 
 
-async def sync_fixtures(db: AsyncSession, client: FootballClientBase) -> int:
+def _apply_round_rules(
+    kickoff_time: datetime, rules: list[dict[str, str]]
+) -> Optional[str]:
+    """
+    Map a kickoff date to a round name using date-range rules.
+    Used in staging for leagues that return empty round_name from the API,
+    to simulate the World Cup round structure with a live active league.
+    Rules are checked in order; the first match wins.
+    Each rule: {"from": "YYYY-MM-DD", "to": "YYYY-MM-DD", "name": "Round name"}
+    """
+    date_str = kickoff_time.date().isoformat()
+    for rule in rules:
+        if rule.get("from", "") <= date_str <= rule.get("to", ""):
+            return rule["name"]
+    return None
+
+
+async def sync_fixtures(
+    db: AsyncSession,
+    client: FootballClientBase,
+    round_date_rules: Optional[list[dict[str, str]]] = None,
+) -> int:
     """
     Fetch upcoming fixtures from the API and upsert into the DB.
     After syncing, deletes unsettled matches that belong to a different league
     so switching FOOTBALL_LEAGUE_ID keeps the DB clean.
     Returns the number of newly inserted fixtures.
+
+    round_date_rules: optional date-range → round-name mapping applied when the
+    API returns an empty round_name. Set via ROUND_DATE_RULES in .env (staging only).
     """
     league_id = client.league_id if isinstance(client, BzzOiroClient) else None
     fixtures = await client.fetch_upcoming_fixtures()
     new_count = 0
 
     for f in fixtures:
+        # Apply date-based round rules when the API provides no round name
+        effective_round_name = f.round_name
+        if not effective_round_name and round_date_rules:
+            effective_round_name = _apply_round_rules(f.kickoff_time, round_date_rules)
+
         result = await db.execute(
             select(Match).where(Match.external_id == f.external_id)
         )
@@ -45,7 +75,7 @@ async def sync_fixtures(db: AsyncSession, client: FootballClientBase) -> int:
             match.score_a = f.score_a
             match.score_b = f.score_b
             match.round_number = f.round_number
-            match.round_name = f.round_name
+            match.round_name = effective_round_name
             match.group_name = f.group_name
             match.league_id = league_id
             if f.status == "finished" and match.result is None:
@@ -64,7 +94,7 @@ async def sync_fixtures(db: AsyncSession, client: FootballClientBase) -> int:
                     if f.status == "finished"
                     else None,
                     round_number=f.round_number,
-                    round_name=f.round_name,
+                    round_name=effective_round_name,
                     group_name=f.group_name,
                     league_id=league_id,
                 )
