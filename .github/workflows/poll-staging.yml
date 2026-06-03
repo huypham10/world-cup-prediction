@@ -1,0 +1,22 @@
+name: Poll and settle (staging)
+
+on:
+  workflow_dispatch:   # manual trigger only — run from the Actions tab
+
+jobs:
+  poll:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Trigger poll-and-settle endpoint (staging)
+        env:
+          STG_APP_URL: ${{ secrets.STG_APP_URL }}
+          TASK_SECRET: ${{ secrets.TASK_SECRET }}
+        run: |
+          if [ -z "$STG_APP_URL" ]; then
+            echo "STG_APP_URL secret not configured — add it in Settings → Secrets → Actions"
+            exit 1
+          fi
+          curl --fail-with-body --max-time 30 -X POST \
+            -H "X-Task-Secret: $TASK_SECRET" \
+            "$STG_APP_URL/tasks/poll"
