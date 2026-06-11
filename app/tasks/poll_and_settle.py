@@ -4,9 +4,12 @@ Poll-and-settle task. Runs independently of the web server.
 Each run:
   1. Sync fixtures from the football API (fetch + upsert into matches table).
   2. For each finished, unsettled match that has a result:
-     a. For every group: settle members who joined BEFORE kickoff using the
-        group's per-round wager (win_amount / loss_amount). No wager = NULL amount.
-        No prediction = automatic loss. Uses INSERT ON CONFLICT DO NOTHING.
+     a. For every group: settle all members who have a prediction for the match
+        (regardless of join time) plus members who joined before kickoff with no
+        prediction (auto-loss). Late joiners with no prediction are excluded unless
+        the group's late_join_counts_as_loss flag is set (then auto-loss).
+        Per-round wager used for amounts. No wager = NULL amount.
+        Uses INSERT ON CONFLICT DO NOTHING.
      b. Mark match.settled = True and commit.
   3. Exit. Idempotent — re-running on the same data produces no duplicate rows.
 
@@ -71,7 +74,9 @@ async def _settle_match(
 ) -> int:
     """
     Create Settlement rows for every eligible group member for one finished match.
-    Eligible = membership.joined_at < match.kickoff_time.
+    A member who predicted before kickoff always counts, regardless of when they joined.
+    A member who joined late AND has no prediction is excluded (or auto-loss if the
+    group's late_join_counts_as_loss toggle is on).
     Returns the number of new rows inserted (0 if already settled).
     """
     now = datetime.now(timezone.utc)
@@ -84,12 +89,9 @@ async def _settle_match(
     for group in groups:
         wager = wagers_by_group_round.get((group.id, round_label))
 
-        member_query = select(Membership).where(Membership.group_id == group.id)
-        if not group.late_join_counts_as_loss:
-            member_query = member_query.where(
-                Membership.joined_at < match.kickoff_time
-            )
-        members_result = await db.execute(member_query)
+        members_result = await db.execute(
+            select(Membership).where(Membership.group_id == group.id)
+        )
         members = members_result.scalars().all()
 
         for member in members:
@@ -100,6 +102,15 @@ async def _settle_match(
                 )
             )
             prediction = pred_result.scalar_one_or_none()
+
+            # A prediction existing means it was made before kickoff (lock is enforced
+            # at the endpoint). Late joiners who predicted play fairly — use their pick.
+            # The toggle only governs late joiners who have no prediction at all.
+            joined_late = member.joined_at >= match.kickoff_time
+            if joined_late and prediction is None:
+                if not group.late_join_counts_as_loss:
+                    continue  # exclude from this match entirely
+                # else: fall through to auto-loss below
 
             correct = prediction is not None and prediction.pick == match.result
             amount = _wager_amount(wager, correct)
