@@ -2,6 +2,8 @@
 
 A small web app for friends to predict the 90-minute outcome of World Cup matches — Team A win, Team B win, or Draw. Wrong prediction = forfeit the round wager; correct = keep it. The app is a **tracker only**: it shows who owes what, real money is settled offline.
 
+App has been deployed using Neon and Railway: https://world-cup-prediction-production.up.railway.app/
+
 ## How it works
 
 - Each person has one account. They predict once per match, and that prediction counts across every group they're in.
@@ -149,16 +151,17 @@ make resettle GROUP_ID=1
 
 Or use the "Re-settle with current wagers" button on the scoreboard (group owners only). This deletes existing settlements for the group, resets the match flags, and re-runs settlement — no fixture sync involved.
 
-## GitHub Actions cron
+## Scheduling the poll task
 
-The workflow at [.github/workflows/poll.yml](.github/workflows/poll.yml) POSTs to `/tasks/poll` every 20 minutes, which also wakes the web app if the hosting platform has scaled it to zero.
+The `POST /tasks/poll` endpoint is triggered every 20 minutes by **cron-job.org** (free). GitHub Actions' scheduled workflows are too unreliable (can run hours late on free plans).
 
-Add these secrets to your GitHub repository (`Settings → Secrets → Actions`):
+**cron-job.org setup:**
+- URL: your production app URL + `/tasks/poll`
+- Method: POST
+- Header: `X-Task-Secret: <your TASK_SECRET>`
+- Schedule: every 20 minutes
 
-| Secret | Value |
-|---|---|
-| `TASK_SECRET` | Same as your `TASK_SECRET` env var |
-| `APP_URL` | Your deployed app URL, e.g. `https://your-app.fly.dev` |
+The workflow at [.github/workflows/poll.yml](.github/workflows/poll.yml) is kept as a manual trigger only (`workflow_dispatch`) — useful for forcing a one-off poll from the GitHub Actions tab.
 
 ## House rules (enforced in code)
 

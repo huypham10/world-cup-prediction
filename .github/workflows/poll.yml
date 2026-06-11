@@ -1,9 +1,7 @@
 name: Poll and settle
 
 on:
-  schedule:
-    - cron: "*/20 * * * *"   # every 20 minutes, all day
-  workflow_dispatch:           # allow a manual run from the Actions tab
+  workflow_dispatch:   # manual trigger only — scheduling handled by cron-job.org
 
 jobs:
   poll:
