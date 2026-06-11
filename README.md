@@ -4,6 +4,8 @@ A small web app for friends to predict the 90-minute outcome of World Cup matche
 
 App has been deployed using Neon and Railway: https://world-cup-prediction-production.up.railway.app/
 
+
+
 ## How it works
 
 - Each person has one account. They predict once per match, and that prediction counts across every group they're in.
