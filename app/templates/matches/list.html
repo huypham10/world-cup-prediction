@@ -77,14 +77,21 @@
       <div id="predict-{{ item.match.id }}" class="border-t bg-gray-50 px-5 py-3">
         {% if item.locked %}
           {# Locked state #}
+          {% set finished = item.match.status == 'finished' and item.match.result %}
+          {% set correct = finished and item.prediction and item.prediction.pick == item.match.result %}
           <div class="flex items-center gap-2 text-sm text-gray-500">
             <svg class="w-4 h-4 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
               <path fill-rule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clip-rule="evenodd"/>
             </svg>
-            <span>Locked.</span>
+            {% if not finished %}<span>Locked.</span>{% endif %}
             {% if item.prediction %}
               <span>Your pick:
-                <strong class="font-semibold text-gray-700">
+                <strong class="font-semibold
+                  {% if finished %}
+                    {% if correct %}text-green-600{% else %}text-red-500{% endif %}
+                  {% else %}
+                    text-gray-700
+                  {% endif %}">
                   {% if item.prediction.pick == 'A' %}
                     {{ item.match.team_a }} wins
                   {% elif item.prediction.pick == 'draw' %}
@@ -92,8 +99,13 @@
                   {% elif item.prediction.pick == 'B' %}
                     {{ item.match.team_b }} wins
                   {% endif %}
+                  {% if finished %}
+                    {% if correct %}✓{% else %}✗{% endif %}
+                  {% endif %}
                 </strong>
               </span>
+            {% elif finished %}
+              <span class="text-red-500 font-medium">No prediction — loss</span>
             {% else %}
               <span class="text-amber-600 font-medium">No prediction — auto loss</span>
             {% endif %}
