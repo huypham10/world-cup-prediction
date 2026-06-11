@@ -75,7 +75,7 @@
         <input type="checkbox" name="late_join_counts_as_loss" value="1"
           {% if group.late_join_counts_as_loss %}checked{% endif %}
           class="rounded border-gray-300 text-green-600 focus:ring-green-500">
-        Count matches played before a member joined as a loss for them
+        Count unpredicted matches before joining as a loss
       </label>
     </div>
   </form>
@@ -99,7 +99,7 @@
   <div class="px-5 py-3 border-b bg-gray-50 flex items-center justify-between">
     <h2 class="font-semibold text-gray-700 text-sm">Wager Settings</h2>
     {% if group.late_join_counts_as_loss %}
-      <span class="text-xs text-gray-500">Matches before joining count as a loss</span>
+      <span class="text-xs text-gray-500">Unpredicted matches before joining count as a loss</span>
     {% endif %}
   </div>
   <table class="w-full text-sm">
@@ -306,7 +306,7 @@
           {% if mr.user.id == current_user.id %}<span class="text-xs text-gray-400 font-normal">(you)</span>{% endif %}
         </span>
         {% if not mr.eligible %}
-          <span class="text-xs text-gray-300 italic">Joined after kickoff</span>
+          <span class="text-xs text-gray-300 italic">No prediction before kickoff</span>
         {% else %}
           <div class="flex items-center gap-3">
             <span class="text-gray-500">
