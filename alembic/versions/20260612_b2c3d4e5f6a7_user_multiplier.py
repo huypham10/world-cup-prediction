@@ -1,4 +1,4 @@
-"""user_multiplier
+"""membership_multiplier
 
 Revision ID: b2c3d4e5f6a7
 Revises: a1b2c3d4e5f6
@@ -16,10 +16,10 @@ depends_on = None
 
 def upgrade() -> None:
     op.add_column(
-        "users",
+        "memberships",
         sa.Column("multiplier", sa.Numeric(5, 2), server_default="1", nullable=False),
     )
 
 
 def downgrade() -> None:
-    op.drop_column("users", "multiplier")
+    op.drop_column("memberships", "multiplier")

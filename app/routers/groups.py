@@ -234,6 +234,39 @@ async def resettle(
     return RedirectResponse(f"/groups/{group_id}/scoreboard", status_code=302)
 
 
+@router.post("/groups/{group_id}/members/{user_id}/set-multiplier")
+async def set_member_multiplier(
+    group_id: int,
+    user_id: int,
+    multiplier: str = Form(...),
+    current_user: Optional[User] = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    if not current_user:
+        return RedirectResponse("/login", status_code=302)
+
+    result = await db.execute(
+        select(Group).where(Group.id == group_id, Group.owner_id == current_user.id)
+    )
+    if not result.scalar_one_or_none():
+        return RedirectResponse(f"/groups/{group_id}/scoreboard", status_code=302)
+
+    try:
+        value = Decimal(multiplier.strip())
+        if value < 0:
+            value = Decimal("1")
+    except InvalidOperation:
+        value = Decimal("1")
+
+    await db.execute(
+        update(Membership)
+        .where(Membership.group_id == group_id, Membership.user_id == user_id)
+        .values(multiplier=value)
+    )
+    await db.commit()
+    return RedirectResponse(f"/groups/{group_id}/scoreboard", status_code=302)
+
+
 @router.post("/groups/{group_id}/members/{user_id}/remove")
 async def remove_member(
     group_id: int,

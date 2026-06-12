@@ -62,14 +62,16 @@ async def scoreboard(
     )
     all_groups = all_groups_result.scalars().all()
 
-    # All members of this group, ordered by name
+    # All members of this group with their multipliers, ordered by name
     members_result = await db.execute(
-        select(User)
+        select(User, Membership.multiplier)
         .join(Membership, Membership.user_id == User.id)
         .where(Membership.group_id == group_id)
         .order_by(User.name)
     )
-    members = members_result.scalars().all()
+    member_rows = members_result.all()
+    members = [row[0] for row in member_rows]
+    multiplier_by_user: dict[int, Decimal] = {row[0].id: row[1] for row in member_rows}
     member_ids = [u.id for u in members]
 
     # All settlements for this group — single query
@@ -134,15 +136,16 @@ async def scoreboard(
     for s in all_settlements:
         by_user.setdefault(s.user_id, []).append(s)
 
-    def _stats(settlements: list[Settlement]) -> dict:
+    def _stats(settlements: list[Settlement], multiplier: Decimal = Decimal("1")) -> dict:
         correct = sum(1 for s in settlements if s.correct)
         wrong = sum(1 for s in settlements if not s.correct)
-        net = sum((s.amount for s in settlements if s.amount is not None), Decimal(0))
+        raw_net = sum((s.amount for s in settlements if s.amount is not None), Decimal(0))
+        net = (raw_net * multiplier).quantize(Decimal("0.01"))
         return {"correct": correct, "wrong": wrong, "played": len(settlements), "net": net}
 
     standings = sorted(
-        [{"user": u, **_stats(by_user.get(u.id, []))} for u in members],
-        key=lambda x: (x["net"], x["correct"]),
+        [{"user": u, **_stats(by_user.get(u.id, []), multiplier_by_user.get(u.id, Decimal("1")))} for u in members],
+        key=lambda x: (x["correct"], x["net"]),
         reverse=True,
     )
 
@@ -165,11 +168,11 @@ async def scoreboard(
     for label in sorted(round_kickoff, key=lambda r: round_kickoff[r], reverse=True):
         user_stats = sorted(
             [
-                {"user": u, **_stats(round_settlements[label].get(u.id, []))}
+                {"user": u, **_stats(round_settlements[label].get(u.id, []), multiplier_by_user.get(u.id, Decimal("1")))}
                 for u in members
                 if round_settlements[label].get(u.id)  # only show eligible members
             ],
-            key=lambda x: (x["net"], x["correct"]),
+            key=lambda x: (x["correct"], x["net"]),
             reverse=True,
         )
         round_standings.append({"label": label, "members": user_stats})
@@ -193,6 +196,7 @@ async def scoreboard(
             "round_standings": round_standings,
             "match_rows": match_rows,
             "members": members,
+            "multiplier_by_user": multiplier_by_user,
             "tournament_rounds": TOURNAMENT_ROUNDS,
             "wagers_by_round": wagers_by_round,
         },

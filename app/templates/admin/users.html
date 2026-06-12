@@ -3,6 +3,7 @@
 {% block content %}
 <h1 class="text-2xl font-bold mb-6">Admin — Users</h1>
 <div class="bg-white rounded-lg shadow overflow-hidden">
+  <div class="overflow-x-auto">
   <table class="w-full text-sm">
     <thead class="bg-gray-50 border-b text-gray-600 text-xs uppercase tracking-wide">
       <tr>
@@ -42,5 +43,6 @@
       {% endfor %}
     </tbody>
   </table>
+  </div>
 </div>
 {% endblock %}
