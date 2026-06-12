@@ -136,41 +136,42 @@
     <h2 class="font-semibold text-gray-700">Standings</h2>
   </div>
   {% if standings %}
+  <div class="overflow-x-auto">
   <table class="w-full text-sm">
     <thead class="text-xs uppercase tracking-wide text-gray-400 border-b">
       <tr>
-        <th class="text-left px-5 py-3 w-8">#</th>
-        <th class="text-left px-5 py-3">Player</th>
-        <th class="text-center px-3 py-3">Played</th>
-        <th class="text-center px-3 py-3">Correct</th>
-        <th class="text-center px-3 py-3">Wrong</th>
+        <th class="text-left px-3 py-3 w-6">#</th>
+        <th class="text-left px-3 py-3">Player</th>
+        <th class="text-center px-2 py-3">P</th>
+        <th class="text-center px-2 py-3">✓</th>
+        <th class="text-center px-2 py-3">✗</th>
         {% if wagers_by_round %}
-        <th class="text-right px-5 py-3">Net</th>
+        <th class="text-right px-3 py-3">Net</th>
         {% endif %}
         {% if group.owner_id == current_user.id %}
-        <th class="px-3 py-3"></th>
+        <th class="px-2 py-3"></th>
         {% endif %}
       </tr>
     </thead>
     <tbody class="divide-y divide-gray-100">
       {% for s in standings %}
       <tr class="{% if s.user.id == current_user.id %}bg-green-50{% else %}hover:bg-gray-50{% endif %}">
-        <td class="px-5 py-3 text-gray-400 font-mono">{{ loop.index }}</td>
-        <td class="px-5 py-3 font-medium">
+        <td class="px-3 py-3 text-gray-400 font-mono">{{ loop.index }}</td>
+        <td class="px-3 py-3 font-medium">
           {{ s.user.name }}
           {% if s.user.id == current_user.id %}
             <span class="text-xs text-gray-400 font-normal ml-1">(you)</span>
           {% endif %}
         </td>
-        <td class="px-3 py-3 text-center text-gray-500">{{ s.played }}</td>
-        <td class="px-3 py-3 text-center">
+        <td class="px-2 py-3 text-center text-gray-500">{{ s.played }}</td>
+        <td class="px-2 py-3 text-center">
           {% if s.correct > 0 %}
             <span class="text-green-600 font-semibold">{{ s.correct }}</span>
           {% else %}
             <span class="text-gray-300">0</span>
           {% endif %}
         </td>
-        <td class="px-3 py-3 text-center">
+        <td class="px-2 py-3 text-center">
           {% if s.wrong > 0 %}
             <span class="text-red-500">{{ s.wrong }}</span>
           {% else %}
@@ -178,7 +179,7 @@
           {% endif %}
         </td>
         {% if wagers_by_round %}
-        <td class="px-5 py-3 text-right font-mono font-semibold
+        <td class="px-3 py-3 text-right font-mono font-semibold
           {% if s.net > 0 %}text-green-600
           {% elif s.net < 0 %}text-red-500
           {% else %}text-gray-400{% endif %}">
@@ -186,7 +187,7 @@
         </td>
         {% endif %}
         {% if group.owner_id == current_user.id %}
-        <td class="px-3 py-3 text-center">
+        <td class="px-2 py-3 text-center">
           {% if s.user.id != current_user.id %}
           <form method="post" action="/groups/{{ group.id }}/members/{{ s.user.id }}/remove"
                 onsubmit="return confirm('Remove {{ s.user.name }} from this group?')">
@@ -201,6 +202,7 @@
       {% endfor %}
     </tbody>
   </table>
+  </div>
   {% else %}
   <p class="px-5 py-8 text-center text-gray-400 text-sm">No matches settled yet.</p>
   {% endif %}
@@ -217,38 +219,39 @@
     </svg>
     <span class="text-sm font-semibold text-gray-600">{{ round.label }}</span>
   </summary>
+  <div class="overflow-x-auto">
   <table class="w-full text-sm">
     <thead class="text-xs uppercase tracking-wide text-gray-400 border-b">
       <tr>
-        <th class="text-left px-5 py-2 w-8">#</th>
-        <th class="text-left px-5 py-2">Player</th>
-        <th class="text-center px-3 py-2">Played</th>
-        <th class="text-center px-3 py-2">Correct</th>
-        <th class="text-center px-3 py-2">Wrong</th>
+        <th class="text-left px-3 py-2 w-6">#</th>
+        <th class="text-left px-3 py-2">Player</th>
+        <th class="text-center px-2 py-2">P</th>
+        <th class="text-center px-2 py-2">✓</th>
+        <th class="text-center px-2 py-2">✗</th>
         {% if wagers_by_round %}
-        <th class="text-right px-5 py-2">Net</th>
+        <th class="text-right px-3 py-2">Net</th>
         {% endif %}
       </tr>
     </thead>
     <tbody class="divide-y divide-gray-100">
       {% for s in round.members %}
       <tr class="{% if s.user.id == current_user.id %}bg-green-50{% else %}hover:bg-gray-50{% endif %}">
-        <td class="px-5 py-2 text-gray-400 font-mono">{{ loop.index }}</td>
-        <td class="px-5 py-2 font-medium">
+        <td class="px-3 py-2 text-gray-400 font-mono">{{ loop.index }}</td>
+        <td class="px-3 py-2 font-medium">
           {{ s.user.name }}
           {% if s.user.id == current_user.id %}<span class="text-xs text-gray-400 font-normal ml-1">(you)</span>{% endif %}
         </td>
-        <td class="px-3 py-2 text-center text-gray-500">{{ s.played }}</td>
-        <td class="px-3 py-2 text-center">
+        <td class="px-2 py-2 text-center text-gray-500">{{ s.played }}</td>
+        <td class="px-2 py-2 text-center">
           {% if s.correct > 0 %}<span class="text-green-600 font-semibold">{{ s.correct }}</span>
           {% else %}<span class="text-gray-300">0</span>{% endif %}
         </td>
-        <td class="px-3 py-2 text-center">
+        <td class="px-2 py-2 text-center">
           {% if s.wrong > 0 %}<span class="text-red-500">{{ s.wrong }}</span>
           {% else %}<span class="text-gray-300">0</span>{% endif %}
         </td>
         {% if wagers_by_round %}
-        <td class="px-5 py-2 text-right font-mono font-semibold
+        <td class="px-3 py-2 text-right font-mono font-semibold
           {% if s.net > 0 %}text-green-600{% elif s.net < 0 %}text-red-500{% else %}text-gray-400{% endif %}">
           {% if s.net > 0 %}+{% endif %}{{ s.net }}
         </td>
@@ -257,6 +260,7 @@
       {% endfor %}
     </tbody>
   </table>
+  </div>
 </details>
 {% endfor %}
 {% endif %}
