@@ -1,0 +1,32 @@
+name: Run migrations
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Target environment
+        required: true
+        default: production
+        type: choice
+        options:
+          - production
+          - staging
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run migrations
+        env:
+          DATABASE_URL: ${{ inputs.environment == 'staging' && secrets.STG_DATABASE_URL || secrets.PROD_DATABASE_URL }}
+        run: alembic upgrade head
