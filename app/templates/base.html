@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="overflow-x-hidden">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -7,18 +7,22 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/htmx.org@1.9.12/dist/htmx.min.js"></script>
 </head>
-<body class="bg-gray-50 min-h-screen">
-  <nav class="bg-green-700 text-white px-6 py-3 flex items-center justify-between shadow">
-    <a href="/" class="font-bold text-lg tracking-tight">World Cup Pool</a>
-    <div class="flex gap-5 items-center text-sm">
+<body class="bg-gray-50 min-h-screen overflow-x-hidden">
+  <nav class="bg-green-700 text-white px-4 sm:px-6 py-3 flex items-center justify-between shadow">
+    <a href="/" class="font-bold text-lg tracking-tight shrink-0">Dự đoán WC26</a>
+    <div class="flex gap-3 sm:gap-5 items-center text-sm min-w-0">
       {% if current_user %}
-        <span class="opacity-75">{{ current_user.name }}</span>
-        <a href="/groups" class="hover:underline">Groups</a>
-        <a href="/matches" class="hover:underline">Matches</a>
         {% if current_user.id == 1 %}
-          <a href="/admin" class="hover:underline">Admin</a>
+          <a href="/admin" class="hover:underline shrink-0 text-right leading-tight">
+            <span class="block truncate max-w-[7rem]">{{ current_user.name }}</span>
+            <span class="block text-xs opacity-60">Admin</span>
+          </a>
+        {% else %}
+          <span class="opacity-75 truncate max-w-[7rem] shrink-0">{{ current_user.name }}</span>
         {% endif %}
-        <form method="post" action="/logout" class="inline">
+        <a href="/groups" class="hover:underline shrink-0">Groups</a>
+        <a href="/matches" class="hover:underline shrink-0">Matches</a>
+        <form method="post" action="/logout" class="inline shrink-0">
           <button type="submit" class="hover:underline">Logout</button>
         </form>
       {% else %}
