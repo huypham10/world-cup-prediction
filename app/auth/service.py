@@ -1,8 +1,14 @@
+import unicodedata
 from datetime import datetime, timezone, timedelta
 from passlib.context import CryptContext
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from ..models.user import User
+
+
+def _normalize_name(name: str) -> str:
+    return unicodedata.normalize("NFC", name).strip()
 
 _crypt = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
@@ -19,18 +25,23 @@ def _verify_pin(pin: str, pin_hash: str) -> bool:
 
 
 async def get_user_by_name(db: AsyncSession, name: str) -> User | None:
-    result = await db.execute(select(User).where(User.name == name))
-    return result.scalar_one_or_none()
+    result = await db.execute(select(User).where(User.name == _normalize_name(name)))
+    return result.scalars().first()
 
 
 async def register(db: AsyncSession, name: str, pin: str) -> tuple[User | None, str | None]:
     """Create a new user. Returns (user, None) on success or (None, error_message) on failure."""
+    name = _normalize_name(name)
     existing = await get_user_by_name(db, name)
     if existing:
         return None, "This name is already taken"
     user = User(name=name, pin_hash=hash_pin(pin))
     db.add(user)
-    await db.commit()
+    try:
+        await db.commit()
+    except IntegrityError:
+        await db.rollback()
+        return None, "This name is already taken"
     await db.refresh(user)
     return user, None
 
@@ -77,7 +88,7 @@ async def set_new_pin(
     db: AsyncSession, name: str, new_pin: str
 ) -> tuple[User | None, str | None]:
     """Set a new PIN for a user whose pin_hash is None (admin-reset state)."""
-    user = await get_user_by_name(db, name)
+    user = await get_user_by_name(db, _normalize_name(name))
     if not user:
         return None, "User not found"
     if user.pin_hash is not None:
