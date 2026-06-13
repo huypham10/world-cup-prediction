@@ -160,15 +160,38 @@ async def settle(db: AsyncSession) -> None:
         )
 
 
-async def run() -> None:
-    logger.info("poll_and_settle: starting")
-
+async def sync() -> None:
+    """Run fixture sync. Automatically triggers settlement if any match became finished."""
+    logger.info("sync: starting")
     async with AsyncSessionLocal() as db:
         client = _make_client()
-        new_fixtures = await sync_fixtures(db, client, settings.round_date_rules or None)
-        logger.info("poll_and_settle: %d new fixtures synced", new_fixtures)
-        await settle(db)
+        new_fixtures, newly_finished = await sync_fixtures(db, client, settings.round_date_rules or None)
+        logger.info("sync: %d new/updated fixtures, %d newly finished", new_fixtures, newly_finished)
+    if newly_finished:
+        logger.info("sync: %d match(es) newly finished — triggering settlement", newly_finished)
+        await run_settle()
+    logger.info("sync: done")
 
+
+async def run_settle() -> None:
+    """Run settlement only — no fixture sync. Session-owning wrapper for background tasks."""
+    logger.info("settle: starting")
+    async with AsyncSessionLocal() as db:
+        await settle(db)
+    logger.info("settle: done")
+
+
+async def run() -> None:
+    """Run sync then settle — the combined job.
+
+    sync() already triggers run_settle() automatically when a match transitions
+    to finished, making this redundant in practice. Kept for backward compatibility
+    with the existing /tasks/poll cron and as a safety net in case a sync call
+    missed a settlement trigger.
+    """
+    logger.info("poll_and_settle: starting")
+    await sync()
+    await run_settle()
     logger.info("poll_and_settle: done")
 
 
