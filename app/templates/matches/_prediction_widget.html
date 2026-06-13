@@ -1,6 +1,6 @@
 {% if locked %}
   {# Locked state #}
-  {% set finished = match.status == 'finished' and match.result %}
+  {% set finished = match.status in ('finished',) and match.result %}
   {% set correct = finished and prediction and prediction.pick == match.result %}
   <div class="flex items-center gap-2 text-sm text-gray-500">
     <svg class="w-4 h-4 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
