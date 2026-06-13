@@ -17,7 +17,7 @@ class FixtureData:
     team_a: str           # home team
     team_b: str           # away team
     kickoff_time: datetime
-    status: str           # "scheduled" | "live" | "finished" | "postponed"
+    status: str           # "scheduled"|"live"|"live_h1"|"live_ht"|"live_h2"|"live_et"|"live_pk"|"live_aet"|"finished"|"postponed"
     score_a: Optional[int] = None
     score_b: Optional[int] = None
     round_number: Optional[int] = None
@@ -40,7 +40,15 @@ class FootballClientBase(ABC):
 _STATUS_MAP = {
     "notstarted": "scheduled",
     "inprogress": "live",
+    "1st_half": "live_h1",
+    "halftime": "live_ht",
+    "2nd_half": "live_h2",
+    "extratime": "live_et",
+    "penalties": "live_pk",
+    "aet": "live_aet",
     "finished": "finished",
+    "postponed": "postponed",
+    "cancelled": "postponed",
 }
 
 
@@ -71,7 +79,7 @@ class BzzOiroClient(FootballClientBase):
             team_a=home["name"] if isinstance(home, dict) else home,
             team_b=away["name"] if isinstance(away, dict) else away,
             kickoff_time=_parse_dt(event["event_date"]),
-            status=_STATUS_MAP.get(event.get("status", ""), "postponed"),
+            status=_STATUS_MAP.get((event.get("status") or "").lower(), "scheduled"),
             score_a=event.get("home_score"),
             score_b=event.get("away_score"),
             round_number=event.get("round_number"),

@@ -65,7 +65,7 @@ async def matches_list(
         {
             "match": m,
             "prediction": predictions.get(m.id),
-            "locked": m.kickoff_time <= now or m.status in ("live", "finished"),
+            "locked": m.kickoff_time <= now or m.status == "finished" or m.status.startswith("live"),
         }
         for m in matches
     ]
