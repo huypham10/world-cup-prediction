@@ -1,5 +1,5 @@
 from collections import defaultdict
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Optional
 
@@ -9,6 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..auth.dependencies import get_current_user
+from ..config import settings
 from ..database import get_db
 from ..models.group import Group
 from ..models.group_wager import GroupWager, TOURNAMENT_ROUNDS
@@ -185,6 +186,34 @@ async def scoreboard(
         w.round_name: w for w in wagers_result.scalars().all()
     }
 
+    # Upcoming matches within 24h that still accept predictions
+    now = datetime.now(timezone.utc)
+    upcoming_result = await db.execute(
+        select(Match)
+        .where(
+            Match.league_id == settings.FOOTBALL_LEAGUE_ID,
+            Match.status == "scheduled",
+            Match.kickoff_time > now,
+            Match.kickoff_time <= now + timedelta(hours=24),
+        )
+        .order_by(Match.kickoff_time)
+    )
+    upcoming_matches = upcoming_result.scalars().all()
+
+    non_voters_by_match: list[dict] = []
+    if upcoming_matches and member_ids:
+        upcoming_ids = [m.id for m in upcoming_matches]
+        voted_result = await db.execute(
+            select(Prediction.match_id, Prediction.user_id).where(
+                Prediction.match_id.in_(upcoming_ids),
+                Prediction.user_id.in_(member_ids),
+            )
+        )
+        voted: set[tuple[int, int]] = {(r.match_id, r.user_id) for r in voted_result}
+        for match in upcoming_matches:
+            missing = [u for u in members if (match.id, u.id) not in voted]
+            non_voters_by_match.append({"match": match, "non_voters": missing})
+
     return templates.TemplateResponse(
         "scoreboard/group.html",
         {
@@ -199,5 +228,6 @@ async def scoreboard(
             "multiplier_by_user": multiplier_by_user,
             "tournament_rounds": TOURNAMENT_ROUNDS,
             "wagers_by_round": wagers_by_round,
+            "non_voters_by_match": non_voters_by_match,
         },
     )
