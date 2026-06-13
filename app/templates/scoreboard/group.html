@@ -153,7 +153,7 @@
           {% if s.net > 0 %}text-green-600
           {% elif s.net < 0 %}text-red-500
           {% else %}text-gray-400{% endif %}">
-          {% if s.net > 0 %}+{% endif %}{{ s.net }}
+          {% if s.net > 0 %}+{% endif %}{{ "%.10g" % (s.net|float) }}
         </td>
         {% endif %}
         {% if group.owner_id == current_user.id %}
@@ -265,10 +265,10 @@
       <tr>
         <td class="px-5 py-2 text-gray-700 font-medium">{{ round }}</td>
         <td class="px-4 py-2 text-center font-mono text-green-600">
-          {{ wager.win_amount if wager.win_amount is not none else '—' }}
+          {{ "%.10g" % (wager.win_amount|float) if wager.win_amount is not none else '—' }}
         </td>
         <td class="px-4 py-2 text-center font-mono text-red-400">
-          {{ wager.loss_amount if wager.loss_amount is not none else '—' }}
+          {{ "%.10g" % (wager.loss_amount|float) if wager.loss_amount is not none else '—' }}
         </td>
       </tr>
       {% endif %}
@@ -323,7 +323,7 @@
         {% if wagers_by_round %}
         <td class="px-3 py-2 text-right font-mono font-semibold
           {% if s.net > 0 %}text-green-600{% elif s.net < 0 %}text-red-500{% else %}text-gray-400{% endif %}">
-          {% if s.net > 0 %}+{% endif %}{{ s.net }}
+          {% if s.net > 0 %}+{% endif %}{{ "%.10g" % (s.net|float) }}
         </td>
         {% endif %}
       </tr>
@@ -396,7 +396,7 @@
             {% endif %}
             {% if mr.amount is not none %}
               <span class="font-mono text-xs font-semibold w-12 text-right {% if mr.amount > 0 %}text-green-600{% else %}text-red-400{% endif %}">
-                {% if mr.amount > 0 %}+{% endif %}{{ mr.amount }}
+                {% if mr.amount > 0 %}+{% endif %}{{ "%.10g" % (mr.amount|float) }}
               </span>
             {% endif %}
           </div>
