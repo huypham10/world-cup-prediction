@@ -58,6 +58,7 @@ async def sync_fixtures(
     league_id = client.league_id if isinstance(client, BzzOiroClient) else None
     fixtures = await client.fetch_upcoming_fixtures()
     new_count = 0
+    newly_finished = 0
 
     for f in fixtures:
         # Apply date-based round rules when the API provides no round name
@@ -80,6 +81,7 @@ async def sync_fixtures(
             match.league_id = league_id
             if f.status == "finished" and match.result is None:
                 match.result = _compute_result(f.score_a, f.score_b)
+                newly_finished += 1
         else:
             db.add(
                 Match(
@@ -112,4 +114,4 @@ async def sync_fixtures(
         )
 
     await db.commit()
-    return new_count
+    return new_count, newly_finished
