@@ -177,7 +177,7 @@ Two cron-job.org jobs (free tier supports multiple):
 - URL: your production app URL + `/tasks/odds`
 - Method: POST
 - Header: `X-Task-Secret: <your TASK_SECRET>`
-- Schedule: every 1–6 hours (odds don't need to be real-time)
+- Schedule: every 60 minutes (matches fetched within the last 59 minutes are skipped)
 
 The workflow at [.github/workflows/poll.yml](.github/workflows/poll.yml) is kept as a manual trigger only (`workflow_dispatch`) — useful for forcing a one-off run from the GitHub Actions tab.
 
@@ -229,6 +229,7 @@ matches         — team_a, team_b, kickoff_time, status, score_a, score_b, resu
                   league_id, round_number, round_name, group_name
                   odds_a, odds_draw, odds_b, odds_fetched_at
 predictions     — user_id, match_id, pick (A/B/draw), locked, created_at, updated_at
+                  odds_visible (null = no odds on match, true = odds shown, false = odds hidden at decision time)
 settlements     — group_id, user_id, match_id, correct, amount
 ```
 
