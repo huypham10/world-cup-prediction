@@ -124,21 +124,27 @@ Alembic uses the sync `psycopg2` driver internally — it strips `+asyncpg` from
 
 ## Poll-and-settle task
 
-Each run does two things:
+Three HTTP endpoints, all guarded by `X-Task-Secret`:
 
-1. **Sync fixtures** — fetch upcoming matches from the football API and upsert into the `matches` table. Also deletes unsettled matches from other leagues so switching `FOOTBALL_LEAGUE_ID` keeps the DB clean (settled matches are never deleted).
-2. **Settle finished matches** — for each finished, unsettled match: create `settlements` rows for eligible group members using the group's per-round wager. No prediction = automatic loss. Marks `match.settled = True` when done.
+| Endpoint | What it does |
+|---|---|
+| `POST /tasks/sync` | Fetch fixtures from the football API and upsert into the DB. Automatically triggers settlement if any match transitions to finished during the sync. **Use this for the cron job.** |
+| `POST /tasks/settle` | Settle finished, unsettled matches only. No fixture sync. Useful as a manual fallback. |
+| `POST /tasks/poll` | Runs sync then settle unconditionally. Kept for backward compatibility. |
+
+`/tasks/sync` detects the live → finished transition during the API loop (no extra DB query) and calls settlement immediately, so it replaces `/tasks/poll` as the recommended cron target.
 
 Prediction locking is enforced at the endpoint (`match.kickoff_time <= now`), not by this task.
 
-Running it manually:
+Running manually:
 ```bash
-make poll
+make poll      # sync + settle
+make sync      # sync only
 ```
 
-Via HTTP (e.g. from curl or a test):
+Via HTTP:
 ```bash
-curl -X POST http://localhost:8000/tasks/poll \
+curl -X POST http://localhost:8000/tasks/sync \
   -H "X-Task-Secret: your_task_secret"
 # Returns 202 Accepted; task runs in the background
 ```
@@ -155,20 +161,20 @@ Or use the "Re-settle with current wagers" button on the scoreboard (group owner
 
 ## Scheduling the poll task
 
-The `POST /tasks/poll` endpoint is triggered every 20 minutes by **cron-job.org** (free). GitHub Actions' scheduled workflows are too unreliable (can run hours late on free plans).
+The `POST /tasks/sync` endpoint is triggered by **cron-job.org** (free). GitHub Actions' scheduled workflows are too unreliable (can run hours late on free plans).
 
 **cron-job.org setup:**
-- URL: your production app URL + `/tasks/poll`
+- URL: your production app URL + `/tasks/sync`
 - Method: POST
 - Header: `X-Task-Secret: <your TASK_SECRET>`
-- Schedule: every 20 minutes
+- Schedule: every 1–2 minutes during live games; every 20 minutes otherwise
 
-The workflow at [.github/workflows/poll.yml](.github/workflows/poll.yml) is kept as a manual trigger only (`workflow_dispatch`) — useful for forcing a one-off poll from the GitHub Actions tab.
+The workflow at [.github/workflows/poll.yml](.github/workflows/poll.yml) is kept as a manual trigger only (`workflow_dispatch`) — useful for forcing a one-off run from the GitHub Actions tab.
 
 ## House rules (enforced in code)
 
 - **Kickoff lock** — the server checks `match.kickoff_time <= now` before accepting any prediction. The client is never trusted for this.
-- **Late joiners** — by default, a member who joined after a match's kickoff is excluded from that match's settlement. Group owners can toggle this to count those matches as losses instead.
+- **Late joiners** — a member who made a prediction before joining the group always has that prediction count. A member with no prediction who joined after kickoff is excluded by default; group owners can toggle this to count those as losses instead.
 - **No prediction = auto loss** — if a member has no prediction when a match finishes, the settlement records a loss for that match.
 - **Idempotency** — the settlement task uses `INSERT ... ON CONFLICT DO NOTHING` and the `match.settled` flag, so running it twice on the same match produces no duplicate rows.
 
@@ -192,11 +198,11 @@ Win and loss amounts are independent — you can set asymmetric wagers (e.g. win
 
 Each group has a scoreboard at `/groups/{id}/scoreboard` showing:
 
-- **Overall standings** — cumulative correct/wrong/net for each member
-- **By Round** — per-round standings (collapsible), same columns
-- **Match History** — settled matches grouped by round (collapsible), showing each member's pick, outcome, and amount
-
-Group owners also see the wager settings form and the re-settle button. Non-owners see a read-only view of the wager settings.
+- **Reminder to vote for upcoming games** — collapsible section at the top. Amber with warning icon if any group member hasn't predicted for a match starting within 24h; neutral gray ("Everyone has voted for upcoming games") once all predictions are in. Hidden when no matches are upcoming.
+- **Overall standings** — cumulative correct/wrong/net for each member, ranked by correct predictions then net. Includes a per-member multiplier column (editable by group owner, read-only for others) applied to the net amount.
+- **Wager settings** — editable by group owner (win/loss amounts per round); read-only view for other members.
+- **Standings By Round** — per-round standings (collapsible), same columns
+- **Group Members' Prediction History by Match** — settled matches grouped by round (collapsible), showing each member's pick, outcome, and amount
 
 Match kickoff times are displayed in the visitor's local timezone (converted client-side from UTC).
 
@@ -206,7 +212,7 @@ Match kickoff times are displayed in the visitor's local timezone (converted cli
 users           — name, pin_hash (bcrypt), failed_attempts, locked_until
 groups          — name, owner_id, join_code, late_join_counts_as_loss
 group_wagers    — group_id, round_name, win_amount, loss_amount
-memberships     — group_id, user_id, role (owner/member), joined_at
+memberships     — group_id, user_id, role (owner/member), joined_at, multiplier
 matches         — team_a, team_b, kickoff_time, status, score_a, score_b, result, settled
                   league_id, round_number, round_name, group_name
 predictions     — user_id, match_id, pick (A/B/draw), locked, created_at, updated_at
@@ -220,7 +226,7 @@ settlements     — group_id, user_id, match_id, correct, amount
 - **Register**: name + 6-digit PIN → bcrypt hash stored, session cookie set.
 - **Login**: name + PIN → 5 failed attempts per account trigger a 15-minute lockout.
 - **Rate limiting**: 200 req/min per IP globally; POST `/register` and POST `/login` additionally capped at 20/hour per IP.
-- **Auth middleware**: all routes except `/login`, `/register`, `/set-pin`, `/logout`, `/health`, and `/tasks/poll` require a valid session cookie — unauthenticated requests are redirected to `/login`.
+- **Auth middleware**: all routes except `/login`, `/register`, `/set-pin`, `/logout`, `/health`, and `/tasks/*` require a valid session cookie — unauthenticated requests are redirected to `/login`.
 - **PIN reset**: the app admin (user ID = 1) can clear a user's PIN hash at `/admin`. The user is prompted to set a new PIN on their next login attempt.
 - **Session**: itsdangerous signed cookie, 60-day expiry, httponly + samesite=lax.
 
