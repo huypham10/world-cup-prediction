@@ -214,6 +214,8 @@ async def scoreboard(
             missing = [u for u in members if (match.id, u.id) not in voted]
             non_voters_by_match.append({"match": match, "non_voters": missing})
 
+    pool_total = sum(s["net"] for s in standings).quantize(Decimal("0.01"))
+
     return templates.TemplateResponse(
         "scoreboard/group.html",
         {
@@ -229,5 +231,6 @@ async def scoreboard(
             "tournament_rounds": TOURNAMENT_ROUNDS,
             "wagers_by_round": wagers_by_round,
             "non_voters_by_match": non_voters_by_match,
+            "pool_total": pool_total,
         },
     )
