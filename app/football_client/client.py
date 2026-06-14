@@ -12,6 +12,13 @@ import httpx
 
 
 @dataclass
+class OddsData:
+    odds_a: Optional[float]     # home win decimal odds
+    odds_draw: Optional[float]
+    odds_b: Optional[float]     # away win decimal odds
+
+
+@dataclass
 class FixtureData:
     external_id: str
     team_a: str           # home team
@@ -34,6 +41,11 @@ class FootballClientBase(ABC):
     @abstractmethod
     async def fetch_fixture(self, external_id: str) -> Optional[FixtureData]:
         """Return the current state of one fixture by its external ID."""
+        ...
+
+    @abstractmethod
+    async def fetch_odds(self, external_id: str) -> Optional[OddsData]:
+        """Return 1x2 decimal odds for one fixture, or None if unavailable."""
         ...
 
 
@@ -117,6 +129,23 @@ class BzzOiroClient(FootballClientBase):
                 return None
             r.raise_for_status()
             return self._parse_event(r.json())
+
+    async def fetch_odds(self, external_id: str) -> Optional[OddsData]:
+        url = f"{self.base_url}/events/{external_id}/odds/"
+        async with httpx.AsyncClient(headers=self._headers, timeout=15.0) as client:
+            r = await client.get(url)
+            if r.status_code in (404, 204):
+                return None
+            r.raise_for_status()
+            data = r.json()
+
+        odds = data.get("odds", {})
+        home = odds.get("home_win")
+        draw = odds.get("draw")
+        away = odds.get("away_win")
+        if not home or not away:
+            return None
+        return OddsData(odds_a=float(home), odds_draw=float(draw) if draw else None, odds_b=float(away))
 
 
 # Keep the old name as an alias so existing stubs don't break

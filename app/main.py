@@ -44,7 +44,7 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 app.add_middleware(SlowAPIMiddleware)
 
 # Paths that don't require a session cookie
-_PUBLIC = {"/login", "/register", "/set-pin", "/logout", "/health", "/tasks/poll", "/tasks/sync", "/tasks/settle"}
+_PUBLIC = {"/login", "/register", "/set-pin", "/logout", "/health", "/tasks/poll", "/tasks/sync", "/tasks/settle", "/tasks/odds"}
 
 @app.middleware("http")
 async def require_session(request: Request, call_next):

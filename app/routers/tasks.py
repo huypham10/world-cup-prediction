@@ -6,7 +6,7 @@ The POST request wakes the web app if it is sleeping (Neon scale-to-zero / idle 
 from fastapi import APIRouter, BackgroundTasks, Header, HTTPException
 
 from ..config import settings
-from ..tasks.poll_and_settle import run as poll_run, run_settle as settle_run, sync as sync_run
+from ..tasks.poll_and_settle import run as poll_run, run_odds as odds_run, run_settle as settle_run, sync as sync_run
 
 router = APIRouter()
 
@@ -48,4 +48,16 @@ async def trigger_settle(
     if x_task_secret != settings.TASK_SECRET:
         raise HTTPException(status_code=401, detail="Invalid task secret")
     background_tasks.add_task(settle_run)
+    return {"status": "accepted"}
+
+
+@router.post("/tasks/odds", status_code=202)
+async def trigger_odds(
+    background_tasks: BackgroundTasks,
+    x_task_secret: str = Header(..., alias="X-Task-Secret"),
+):
+    """Fetch bookmaker odds for upcoming scheduled matches only."""
+    if x_task_secret != settings.TASK_SECRET:
+        raise HTTPException(status_code=401, detail="Invalid task secret")
+    background_tasks.add_task(odds_run)
     return {"status": "accepted"}

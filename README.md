@@ -124,11 +124,12 @@ Alembic uses the sync `psycopg2` driver internally — it strips `+asyncpg` from
 
 ## Poll-and-settle task
 
-Three HTTP endpoints, all guarded by `X-Task-Secret`:
+Four HTTP endpoints, all guarded by `X-Task-Secret`:
 
 | Endpoint | What it does |
 |---|---|
-| `POST /tasks/sync` | Fetch fixtures from the football API and upsert into the DB. Automatically triggers settlement if any match transitions to finished during the sync. **Use this for the cron job.** |
+| `POST /tasks/sync` | Fetch fixtures from the football API and upsert into the DB. Automatically triggers settlement if any match transitions to finished during the sync. **Use this for the main cron job.** |
+| `POST /tasks/odds` | Fetch bookmaker 1x2 odds for upcoming scheduled matches. Skips matches fetched within the last hour. **Use a separate, less frequent cron job for this.** |
 | `POST /tasks/settle` | Settle finished, unsettled matches only. No fixture sync. Useful as a manual fallback. |
 | `POST /tasks/poll` | Runs sync then settle unconditionally. Kept for backward compatibility. |
 
@@ -140,6 +141,7 @@ Running manually:
 ```bash
 make poll      # sync + settle
 make sync      # sync only
+make odds      # fetch odds only
 ```
 
 Via HTTP:
@@ -163,11 +165,19 @@ Or use the "Re-settle with current wagers" button on the scoreboard (group owner
 
 The `POST /tasks/sync` endpoint is triggered by **cron-job.org** (free). GitHub Actions' scheduled workflows are too unreliable (can run hours late on free plans).
 
-**cron-job.org setup:**
+Two cron-job.org jobs (free tier supports multiple):
+
+**Fixtures (main job):**
 - URL: your production app URL + `/tasks/sync`
 - Method: POST
 - Header: `X-Task-Secret: <your TASK_SECRET>`
 - Schedule: every 1–2 minutes during live games; every 20 minutes otherwise
+
+**Odds:**
+- URL: your production app URL + `/tasks/odds`
+- Method: POST
+- Header: `X-Task-Secret: <your TASK_SECRET>`
+- Schedule: every 60 minutes (matches fetched within the last 59 minutes are skipped)
 
 The workflow at [.github/workflows/poll.yml](.github/workflows/poll.yml) is kept as a manual trigger only (`workflow_dispatch`) — useful for forcing a one-off run from the GitHub Actions tab.
 
@@ -206,6 +216,8 @@ Each group has a scoreboard at `/groups/{id}/scoreboard` showing:
 
 Match kickoff times are displayed in the visitor's local timezone (converted client-side from UTC).
 
+Upcoming matches display bookmaker implied probabilities (home % / draw % / away %) when odds have been fetched, normalised from decimal odds so they sum to 100%.
+
 ## Data model
 
 ```
@@ -215,7 +227,9 @@ group_wagers    — group_id, round_name, win_amount, loss_amount
 memberships     — group_id, user_id, role (owner/member), joined_at, multiplier
 matches         — team_a, team_b, kickoff_time, status, score_a, score_b, result, settled
                   league_id, round_number, round_name, group_name
+                  odds_a, odds_draw, odds_b, odds_fetched_at
 predictions     — user_id, match_id, pick (A/B/draw), locked, created_at, updated_at
+                  odds_visible (null = no odds on match, true = odds shown, false = odds hidden at decision time)
 settlements     — group_id, user_id, match_id, correct, amount
 ```
 
@@ -238,6 +252,7 @@ make migrate                      # apply pending migrations (dev branch)
 make migrate-prod PROD_DATABASE_URL=<url>  # apply to production
 make poll                         # run poll-and-settle once (CLI)
 make sync                         # sync fixtures only — no settlement
+make odds                         # fetch bookmaker odds for upcoming matches
 make resettle GROUP_ID=<id>       # re-settle one group with current wagers
 make install                      # create .venv and install dependencies
 ```

@@ -1,4 +1,4 @@
-.PHONY: run migrate migrate-prod poll sync resettle wipe-data install
+.PHONY: run migrate migrate-prod poll sync odds resettle wipe-data install
 
 run:
 	.venv/bin/uvicorn app.main:app --reload
@@ -15,6 +15,9 @@ poll:
 
 sync:
 	set -a && source .env && set +a && .venv/bin/python -m app.tasks.sync_fixtures_cli
+
+odds:
+	set -a && source .env && set +a && .venv/bin/python -c "import asyncio; from app.tasks.poll_and_settle import sync_odds; asyncio.run(sync_odds())"
 
 resettle:
 	@test -n "$(GROUP_ID)" || (echo "Usage: make resettle GROUP_ID=<id>" && exit 1)
