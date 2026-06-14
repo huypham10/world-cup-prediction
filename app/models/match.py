@@ -3,7 +3,9 @@ from __future__ import annotations
 from datetime import datetime
 from typing import TYPE_CHECKING, List, Optional
 
-from sqlalchemy import Boolean, DateTime, Index, Integer, String
+from decimal import Decimal
+
+from sqlalchemy import Boolean, DateTime, Index, Integer, Numeric, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .base import Base
@@ -42,6 +44,11 @@ class Match(Base):
     round_number: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     round_name: Mapped[Optional[str]] = mapped_column(String(80), nullable=True)
     group_name: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    # Bookmaker decimal odds (home / draw / away); null until fetched
+    odds_a: Mapped[Optional[Decimal]] = mapped_column(Numeric(6, 2), nullable=True)
+    odds_draw: Mapped[Optional[Decimal]] = mapped_column(Numeric(6, 2), nullable=True)
+    odds_b: Mapped[Optional[Decimal]] = mapped_column(Numeric(6, 2), nullable=True)
+    odds_fetched_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
     # Relationships
     predictions: Mapped[List["Prediction"]] = relationship(back_populates="match")
