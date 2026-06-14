@@ -22,7 +22,7 @@
     applyOdds(next);
   }
   document.addEventListener('DOMContentLoaded', () => applyOdds(localStorage.getItem(ODDS_KEY) === 'true'));
-  document.addEventListener('htmx:afterSwap', () => applyOdds(localStorage.getItem(ODDS_KEY) === 'true'));
+  document.addEventListener('htmx:afterSettle', () => applyOdds(localStorage.getItem(ODDS_KEY) === 'true'));
 </script>
 
 {% if not matches %}
@@ -162,6 +162,7 @@
                 hx-target="#predict-{{ item.match.id }}"
                 hx-swap="innerHTML"
                 hx-include="closest form"
+                {% if pct_a %}hx-vals="js:{odds_visible: localStorage.getItem('showOdds') === 'true'}"{% endif %}
                 class="flex-1 px-3 py-1.5 rounded border text-sm font-medium transition-colors flex flex-col items-center
                   {% if item.prediction and item.prediction.pick == 'A' %}
                     bg-green-600 border-green-600 text-white hover:bg-green-700
@@ -179,6 +180,7 @@
                 hx-target="#predict-{{ item.match.id }}"
                 hx-swap="innerHTML"
                 hx-include="closest form"
+                {% if pct_a %}hx-vals="js:{odds_visible: localStorage.getItem('showOdds') === 'true'}"{% endif %}
                 class="flex-1 px-3 py-1.5 rounded border text-sm font-medium transition-colors flex flex-col items-center
                   {% if item.prediction and item.prediction.pick == 'draw' %}
                     bg-green-600 border-green-600 text-white hover:bg-green-700
@@ -196,6 +198,7 @@
                 hx-target="#predict-{{ item.match.id }}"
                 hx-swap="innerHTML"
                 hx-include="closest form"
+                {% if pct_a %}hx-vals="js:{odds_visible: localStorage.getItem('showOdds') === 'true'}"{% endif %}
                 class="flex-1 px-3 py-1.5 rounded border text-sm font-medium transition-colors flex flex-col items-center
                   {% if item.prediction and item.prediction.pick == 'B' %}
                     bg-green-600 border-green-600 text-white hover:bg-green-700

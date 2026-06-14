@@ -184,7 +184,7 @@ async def run_settle() -> None:
 async def sync_odds() -> None:
     """Fetch 1x2 odds for upcoming scheduled matches not fetched in the last hour."""
     now = datetime.now(timezone.utc)
-    stale_before = now - timedelta(minutes=5)
+    stale_before = now - timedelta(minutes=59)
     logger.info("sync_odds: starting")
 
     async with AsyncSessionLocal() as db:

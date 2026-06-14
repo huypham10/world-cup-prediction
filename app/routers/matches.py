@@ -99,6 +99,7 @@ async def submit_prediction(
     request: Request,
     match_id: int,
     pick: str = Form(...),
+    odds_visible: Optional[str] = Form(None),
     current_user: Optional[User] = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -125,10 +126,12 @@ async def submit_prediction(
         )
     )
     pred = result.scalar_one_or_none()
+    ov = (odds_visible == "true") if odds_visible is not None else None
     if pred:
         pred.pick = pick
+        pred.odds_visible = ov
     else:
-        pred = Prediction(user_id=current_user.id, match_id=match_id, pick=pick)
+        pred = Prediction(user_id=current_user.id, match_id=match_id, pick=pick, odds_visible=ov)
         db.add(pred)
     await db.commit()
     await db.refresh(pred)
