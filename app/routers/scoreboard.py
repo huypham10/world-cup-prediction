@@ -140,13 +140,15 @@ async def scoreboard(
     def _stats(settlements: list[Settlement], multiplier: Decimal = Decimal("1")) -> dict:
         correct = sum(1 for s in settlements if s.correct)
         wrong = sum(1 for s in settlements if not s.correct)
+        played = len(settlements)
         raw_net = sum((s.amount for s in settlements if s.amount is not None), Decimal(0))
         net = (raw_net * multiplier).quantize(Decimal("0.01"))
-        return {"correct": correct, "wrong": wrong, "played": len(settlements), "net": net}
+        win_pct = round(correct / played * 100) if played else 0
+        return {"correct": correct, "wrong": wrong, "played": played, "net": net, "win_pct": win_pct}
 
     standings = sorted(
         [{"user": u, **_stats(by_user.get(u.id, []), multiplier_by_user.get(u.id, Decimal("1")))} for u in members],
-        key=lambda x: (x["correct"], x["net"]),
+        key=lambda x: (x["win_pct"], x["played"], x["net"]),
         reverse=True,
     )
 
