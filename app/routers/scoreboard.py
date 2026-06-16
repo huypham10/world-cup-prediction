@@ -216,6 +216,38 @@ async def scoreboard(
             missing = [u for u in members if (match.id, u.id) not in voted]
             non_voters_by_match.append({"match": match, "non_voters": missing})
 
+    # Live matches — show predictions without outcome
+    live_match_rows = []
+    if member_ids:
+        live_result = await db.execute(
+            select(Match)
+            .where(
+                Match.league_id == settings.FOOTBALL_LEAGUE_ID,
+                Match.status.like("live%"),
+            )
+            .order_by(Match.kickoff_time.desc())
+        )
+        live_matches = live_result.scalars().all()
+        if live_matches:
+            live_ids = [m.id for m in live_matches]
+            live_preds_result = await db.execute(
+                select(Prediction).where(
+                    Prediction.match_id.in_(live_ids),
+                    Prediction.user_id.in_(member_ids),
+                )
+            )
+            live_preds = {
+                (p.match_id, p.user_id): p for p in live_preds_result.scalars().all()
+            }
+            for match in live_matches:
+                live_match_rows.append({
+                    "match": match,
+                    "member_results": [
+                        {"user": u, "pick": live_preds[(match.id, u.id)].pick if (match.id, u.id) in live_preds else None}
+                        for u in members
+                    ],
+                })
+
     pool_total = sum(s["net"] for s in standings).quantize(Decimal("0.01"))
 
     return templates.TemplateResponse(
@@ -234,5 +266,6 @@ async def scoreboard(
             "wagers_by_round": wagers_by_round,
             "non_voters_by_match": non_voters_by_match,
             "pool_total": pool_total,
+            "live_match_rows": live_match_rows,
         },
     )

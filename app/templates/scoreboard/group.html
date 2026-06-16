@@ -366,8 +366,39 @@
 {% endif %}
 
 {# Match history — grouped by round, each round collapsible via <details> #}
-{% if match_rows %}
+{% if match_rows or live_match_rows %}
 <h2 class="font-semibold text-gray-700 mb-3">Group Members' Prediction History by Match</h2>
+
+{# Live matches — picks visible, no outcomes #}
+{% for row in live_match_rows %}
+<div class="bg-white rounded-lg shadow overflow-hidden mb-3">
+  <div class="px-5 py-3 border-b flex items-center justify-between">
+    <div class="flex items-center gap-3">
+      <span class="font-semibold text-gray-800">{{ row.match.team_a }}</span>
+      <span class="font-bold tabular-nums text-gray-700">{{ row.match.score_a }} – {{ row.match.score_b }}</span>
+      <span class="font-semibold text-gray-800">{{ row.match.team_b }}</span>
+    </div>
+    <span class="text-xs font-semibold text-red-600 bg-red-50 px-2 py-0.5 rounded-full">LIVE</span>
+  </div>
+  <div class="divide-y divide-gray-50">
+    {% for mr in row.member_results %}
+    <div class="px-5 py-2.5 flex items-center justify-between text-sm">
+      <span class="text-gray-700 font-medium w-32 truncate">
+        {{ mr.user.name }}
+        {% if mr.user.id == current_user.id %}<span class="text-xs text-gray-400 font-normal">(you)</span>{% endif %}
+      </span>
+      <span class="text-gray-500">
+        {% if mr.pick == 'A' %}{{ row.match.team_a }} win
+        {% elif mr.pick == 'B' %}{{ row.match.team_b }} win
+        {% elif mr.pick == 'draw' %}Draw
+        {% else %}<span class="italic text-gray-300">No prediction</span>{% endif %}
+      </span>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endfor %}
+
 {% set ns = namespace(current_round='') %}
 {% for row in match_rows %}
 {% set match = row.match %}
