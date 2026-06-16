@@ -99,6 +99,7 @@
         <th class="text-center px-2 py-3">P</th>
         <th class="text-center px-2 py-3">✓</th>
         <th class="text-center px-2 py-3">✗</th>
+        <th class="text-center px-2 py-3">✓%</th>
         <th class="text-center px-2 py-3">Mult</th>
         {% if wagers_by_round %}
         <th class="text-right px-3 py-3">Net</th>
@@ -133,6 +134,9 @@
           {% else %}
             <span class="text-gray-300">0</span>
           {% endif %}
+        </td>
+        <td class="px-2 py-3 text-center text-green-600">
+          {% if s.played %}{{ s.win_pct }}%{% else %}<span class="text-gray-300">—</span>{% endif %}
         </td>
         <td class="px-2 py-3 text-center">
           {% if group.owner_id == current_user.id %}
@@ -174,7 +178,7 @@
     {% if wagers_by_round %}
     <tfoot>
       <tr class="border-t-2 border-gray-200 bg-gray-50">
-        <td colspan="6" class="px-3 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wide">Pool total</td>
+        <td colspan="7" class="px-3 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wide">Pool total</td>
         <td class="px-3 py-2.5 text-right font-mono font-bold
           {% if pool_total > 0 %}text-green-600
           {% elif pool_total < 0 %}text-red-500
@@ -312,6 +316,8 @@
         <th class="text-center px-2 py-2">P</th>
         <th class="text-center px-2 py-2">✓</th>
         <th class="text-center px-2 py-2">✗</th>
+        <th class="text-center px-2 py-2">✓%</th>
+        <th class="text-center px-2 py-2">Mult</th>
         {% if wagers_by_round %}
         <th class="text-right px-3 py-2">Net</th>
         {% endif %}
@@ -319,6 +325,7 @@
     </thead>
     <tbody class="divide-y divide-gray-100">
       {% for s in round.members %}
+      {% set m = multiplier_by_user.get(s.user.id, 1) %}
       <tr class="{% if s.user.id == current_user.id %}bg-green-50{% else %}hover:bg-gray-50{% endif %}">
         <td class="px-3 py-2 text-gray-400 font-mono">{{ loop.index }}</td>
         <td class="px-3 py-2 font-medium">
@@ -333,6 +340,15 @@
         <td class="px-2 py-2 text-center">
           {% if s.wrong > 0 %}<span class="text-red-500">{{ s.wrong }}</span>
           {% else %}<span class="text-gray-300">0</span>{% endif %}
+        </td>
+        <td class="px-2 py-2 text-center font-mono text-sm
+          {% if s.win_pct >= 60 %}text-green-600 font-semibold
+          {% elif s.win_pct >= 40 %}text-green-400
+          {% else %}text-green-200{% endif %}">
+          {% if s.played %}{{ s.win_pct }}%{% else %}<span class="text-gray-300">—</span>{% endif %}
+        </td>
+        <td class="px-2 py-2 text-center">
+          <span class="text-xs {% if m != 1 %}text-purple-500 font-semibold{% else %}text-gray-300{% endif %}">{{ "%.10g" % (m|float) }}</span>
         </td>
         {% if wagers_by_round %}
         <td class="px-3 py-2 text-right font-mono font-semibold
