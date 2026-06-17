@@ -17,6 +17,7 @@ from ..models.match import Match
 from ..models.prediction import Prediction
 from ..models.user import User
 from ..templates import templates
+from .admin import get_site_config
 
 router = APIRouter()
 
@@ -70,6 +71,8 @@ async def matches_list(
         for m in matches
     ]
 
+    config = await get_site_config(db)
+
     return templates.TemplateResponse(
         "matches/list.html",
         {
@@ -78,6 +81,7 @@ async def matches_list(
             "matches": match_data,
             "now": now,
             "synced": synced,
+            "show_odds": config.show_odds,
         },
     )
 
@@ -136,6 +140,8 @@ async def submit_prediction(
     await db.commit()
     await db.refresh(pred)
 
+    config = await get_site_config(db)
+
     # HTMX requests get a partial HTML response; plain form submits get a redirect
     is_htmx = request.headers.get("HX-Request") == "true"
     if is_htmx:
@@ -146,6 +152,7 @@ async def submit_prediction(
                 "match": match,
                 "prediction": pred,
                 "locked": False,
+                "show_odds": config.show_odds,
             },
         )
     return RedirectResponse("/matches", status_code=302)

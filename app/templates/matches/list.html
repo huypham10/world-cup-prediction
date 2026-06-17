@@ -3,18 +3,22 @@
 {% block content %}
 <div class="mb-6 flex items-center justify-between">
   <h1 class="text-2xl font-bold">Matches</h1>
+  {% if show_odds %}
   <button id="odds-toggle"
     onclick="toggleOdds()"
     class="text-xs px-3 py-1.5 rounded-full border border-gray-300 text-gray-500 hover:bg-gray-50 transition-colors">
     Show probabilities
   </button>
+  {% endif %}
 </div>
 
+{% if show_odds %}
 <script>
   const ODDS_KEY = 'showOdds';
   function applyOdds(show) {
     document.querySelectorAll('.odds-pct').forEach(el => el.classList.toggle('hidden', !show));
-    document.getElementById('odds-toggle').textContent = show ? 'Hide probabilities' : 'Show probabilities';
+    const btn = document.getElementById('odds-toggle');
+    if (btn) btn.textContent = show ? 'Hide probabilities' : 'Show probabilities';
   }
   function toggleOdds() {
     const next = localStorage.getItem(ODDS_KEY) !== 'true';
@@ -24,6 +28,9 @@
   document.addEventListener('DOMContentLoaded', () => applyOdds(localStorage.getItem(ODDS_KEY) === 'true'));
   document.addEventListener('htmx:afterSettle', () => applyOdds(localStorage.getItem(ODDS_KEY) === 'true'));
 </script>
+{% else %}
+<script>localStorage.removeItem('showOdds');</script>
+{% endif %}
 
 {% if not matches %}
   <div class="text-center py-16 text-gray-500">
@@ -162,7 +169,7 @@
                 hx-target="#predict-{{ item.match.id }}"
                 hx-swap="innerHTML"
                 hx-include="closest form"
-                {% if pct_a %}hx-vals="js:{odds_visible: localStorage.getItem('showOdds') === 'true'}"{% endif %}
+                {% if show_odds and pct_a %}hx-vals="js:{odds_visible: localStorage.getItem('showOdds') === 'true'}"{% endif %}
                 class="flex-1 px-3 py-1.5 rounded border text-sm font-medium transition-colors flex flex-col items-center
                   {% if item.prediction and item.prediction.pick == 'A' %}
                     bg-green-600 border-green-600 text-white hover:bg-green-700
@@ -170,7 +177,7 @@
                     bg-white border-gray-300 text-gray-700 hover:bg-gray-50
                   {% endif %}">
                 <span>{{ item.match.team_a }} wins</span>
-                {% if pct_a %}<span class="odds-pct hidden text-xs opacity-60">{{ pct_a }}%</span>{% endif %}
+                {% if show_odds and pct_a %}<span class="odds-pct hidden text-xs opacity-60">{{ pct_a }}%</span>{% endif %}
               </button>
               <button
                 type="submit"
@@ -180,7 +187,7 @@
                 hx-target="#predict-{{ item.match.id }}"
                 hx-swap="innerHTML"
                 hx-include="closest form"
-                {% if pct_a %}hx-vals="js:{odds_visible: localStorage.getItem('showOdds') === 'true'}"{% endif %}
+                {% if show_odds and pct_a %}hx-vals="js:{odds_visible: localStorage.getItem('showOdds') === 'true'}"{% endif %}
                 class="flex-1 px-3 py-1.5 rounded border text-sm font-medium transition-colors flex flex-col items-center
                   {% if item.prediction and item.prediction.pick == 'draw' %}
                     bg-green-600 border-green-600 text-white hover:bg-green-700
@@ -188,7 +195,7 @@
                     bg-white border-gray-300 text-gray-700 hover:bg-gray-50
                   {% endif %}">
                 <span>Draw</span>
-                {% if pct_d %}<span class="odds-pct hidden text-xs opacity-60">{{ pct_d }}%</span>{% endif %}
+                {% if show_odds and pct_d %}<span class="odds-pct hidden text-xs opacity-60">{{ pct_d }}%</span>{% endif %}
               </button>
               <button
                 type="submit"
@@ -198,7 +205,7 @@
                 hx-target="#predict-{{ item.match.id }}"
                 hx-swap="innerHTML"
                 hx-include="closest form"
-                {% if pct_a %}hx-vals="js:{odds_visible: localStorage.getItem('showOdds') === 'true'}"{% endif %}
+                {% if show_odds and pct_a %}hx-vals="js:{odds_visible: localStorage.getItem('showOdds') === 'true'}"{% endif %}
                 class="flex-1 px-3 py-1.5 rounded border text-sm font-medium transition-colors flex flex-col items-center
                   {% if item.prediction and item.prediction.pick == 'B' %}
                     bg-green-600 border-green-600 text-white hover:bg-green-700
@@ -206,7 +213,7 @@
                     bg-white border-gray-300 text-gray-700 hover:bg-gray-50
                   {% endif %}">
                 <span>{{ item.match.team_b }} wins</span>
-                {% if pct_b %}<span class="odds-pct hidden text-xs opacity-60">{{ pct_b }}%</span>{% endif %}
+                {% if show_odds and pct_b %}<span class="odds-pct hidden text-xs opacity-60">{{ pct_b }}%</span>{% endif %}
               </button>
             </div>
           </form>

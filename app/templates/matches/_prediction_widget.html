@@ -35,7 +35,7 @@
   </div>
 {% else %}
   {# Unlocked: HTMX prediction buttons #}
-  {% if match.odds_a and match.odds_draw and match.odds_b %}
+  {% if show_odds and match.odds_a and match.odds_draw and match.odds_b %}
     {% set _pa = 1.0 / match.odds_a|float %}
     {% set _pd = 1.0 / match.odds_draw|float %}
     {% set _pb = 1.0 / match.odds_b|float %}
