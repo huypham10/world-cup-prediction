@@ -1,7 +1,29 @@
 {% extends "base.html" %}
 {% block title %}Admin — World Cup Pool{% endblock %}
 {% block content %}
-<h1 class="text-2xl font-bold mb-6">Admin — Users</h1>
+<h1 class="text-2xl font-bold mb-6">Admin</h1>
+
+<h2 class="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">Config</h2>
+<div class="bg-white rounded-lg shadow overflow-hidden mb-8">
+  <div class="divide-y divide-gray-100">
+    <div class="flex items-center justify-between px-4 py-3">
+      <div>
+        <p class="text-sm font-medium text-gray-800">Show probabilities</p>
+        <p class="text-xs text-gray-400 mt-0.5">Display bookmaker implied probability % on prediction buttons</p>
+      </div>
+      <form method="post" action="/admin/toggle-odds">
+        <button type="submit"
+          class="text-sm px-4 py-1.5 rounded-lg border font-medium transition-colors
+            {% if show_odds %}border-green-300 bg-green-50 text-green-700 hover:bg-green-100
+            {% else %}border-gray-300 bg-white text-gray-500 hover:bg-gray-50{% endif %}">
+          {% if show_odds %}On{% else %}Off{% endif %}
+        </button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<h2 class="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">Users</h2>
 <div class="bg-white rounded-lg shadow overflow-hidden">
   <div class="overflow-x-auto">
   <table class="w-full text-sm">

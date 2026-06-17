@@ -40,6 +40,7 @@ class Prediction(Base):
         onupdate=lambda: datetime.now(timezone.utc),
     )
     locked: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, index=True)
+    odds_visible: Mapped[bool] = mapped_column(Boolean, nullable=True)
 
     # Relationships
     user: Mapped["User"] = relationship(back_populates="predictions")

@@ -17,6 +17,7 @@ from ..models.match import Match
 from ..models.prediction import Prediction
 from ..models.user import User
 from ..templates import templates
+from .admin import get_site_config
 
 router = APIRouter()
 
@@ -70,6 +71,8 @@ async def matches_list(
         for m in matches
     ]
 
+    config = await get_site_config(db)
+
     return templates.TemplateResponse(
         "matches/list.html",
         {
@@ -78,6 +81,7 @@ async def matches_list(
             "matches": match_data,
             "now": now,
             "synced": synced,
+            "show_odds": config.show_odds,
         },
     )
 
@@ -99,6 +103,7 @@ async def submit_prediction(
     request: Request,
     match_id: int,
     pick: str = Form(...),
+    odds_visible: Optional[str] = Form(None),
     current_user: Optional[User] = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -125,13 +130,17 @@ async def submit_prediction(
         )
     )
     pred = result.scalar_one_or_none()
+    ov = (odds_visible == "true") if odds_visible is not None else None
     if pred:
         pred.pick = pick
+        pred.odds_visible = ov
     else:
-        pred = Prediction(user_id=current_user.id, match_id=match_id, pick=pick)
+        pred = Prediction(user_id=current_user.id, match_id=match_id, pick=pick, odds_visible=ov)
         db.add(pred)
     await db.commit()
     await db.refresh(pred)
+
+    config = await get_site_config(db)
 
     # HTMX requests get a partial HTML response; plain form submits get a redirect
     is_htmx = request.headers.get("HX-Request") == "true"
@@ -143,6 +152,7 @@ async def submit_prediction(
                 "match": match,
                 "prediction": pred,
                 "locked": False,
+                "show_odds": config.show_odds,
             },
         )
     return RedirectResponse("/matches", status_code=302)

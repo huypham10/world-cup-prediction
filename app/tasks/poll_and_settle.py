@@ -23,17 +23,17 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Optional
 
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
 from app.database import AsyncSessionLocal
-from app.football_client.client import BzzOiroClient
+from app.football_client.client import BzzOiroClient, OddsData
 from app.football_client.sync import sync_fixtures
 from app.models.group import Group
 from app.models.group_wager import GroupWager
@@ -179,6 +179,51 @@ async def run_settle() -> None:
     async with AsyncSessionLocal() as db:
         await settle(db)
     logger.info("settle: done")
+
+
+async def sync_odds() -> None:
+    """Fetch 1x2 odds for upcoming scheduled matches not fetched in the last hour."""
+    now = datetime.now(timezone.utc)
+    stale_before = now - timedelta(minutes=59)
+    logger.info("sync_odds: starting")
+
+    async with AsyncSessionLocal() as db:
+        result = await db.execute(
+            select(Match).where(
+                Match.status == "scheduled",
+                Match.kickoff_time > now,
+                Match.kickoff_time <= now + timedelta(days=7),
+                or_(
+                    Match.odds_fetched_at.is_(None),
+                    Match.odds_fetched_at < stale_before,
+                ),
+            )
+        )
+        matches = result.scalars().all()
+        logger.info("sync_odds: %d matches need odds", len(matches))
+
+        client = _make_client()
+        for match in matches:
+            if not match.external_id:
+                continue
+            try:
+                odds: Optional[OddsData] = await client.fetch_odds(match.external_id)
+            except Exception as exc:
+                logger.warning("sync_odds: failed for match %s — %s", match.external_id, exc)
+                continue
+            if odds:
+                match.odds_a = odds.odds_a
+                match.odds_draw = odds.odds_draw
+                match.odds_b = odds.odds_b
+            match.odds_fetched_at = now
+
+        await db.commit()
+    logger.info("sync_odds: done")
+
+
+async def run_odds() -> None:
+    """Session-owning wrapper for sync_odds — used as a background task."""
+    await sync_odds()
 
 
 async def run() -> None:
