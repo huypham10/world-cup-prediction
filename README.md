@@ -231,6 +231,7 @@ matches         — team_a, team_b, kickoff_time, status, score_a, score_b, resu
 predictions     — user_id, match_id, pick (A/B/draw), locked, created_at, updated_at
                   odds_visible (null = no odds on match, true = odds shown, false = odds hidden at decision time)
 settlements     — group_id, user_id, match_id, correct, amount
+site_config     — singleton row (id=1); show_odds (bool, default true)
 ```
 
 `groups.stake` was replaced by `group_wagers` to support per-round win/loss amounts.
@@ -242,6 +243,7 @@ settlements     — group_id, user_id, match_id, correct, amount
 - **Rate limiting**: 200 req/min per IP globally; POST `/register` and POST `/login` additionally capped at 20/hour per IP.
 - **Auth middleware**: all routes except `/login`, `/register`, `/set-pin`, `/logout`, `/health`, and `/tasks/*` require a valid session cookie — unauthenticated requests are redirected to `/login`.
 - **PIN reset**: the app admin (user ID = 1) can clear a user's PIN hash at `/admin`. The user is prompted to set a new PIN on their next login attempt.
+- **Site config**: the admin panel (`/admin`) has a Config section for site-wide toggles. Currently: **Show probabilities** — when off, the "Show/Hide probabilities" button is hidden from all users, odds percentages are never rendered, and any saved localStorage state is cleared. Toggling is instant and persists across restarts.
 - **Session**: itsdangerous signed cookie, 60-day expiry, httponly + samesite=lax.
 
 ## Make targets
