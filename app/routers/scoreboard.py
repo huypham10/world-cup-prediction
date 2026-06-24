@@ -137,17 +137,26 @@ async def scoreboard(
     for s in all_settlements:
         by_user.setdefault(s.user_id, []).append(s)
 
-    def _stats(settlements: list[Settlement], multiplier: Decimal = Decimal("1")) -> dict:
+    # Which match_ids each user actually submitted a prediction for (excludes auto-losses)
+    predicted_match_ids_by_user: dict[int, set[int]] = defaultdict(set)
+    for (match_id, user_id) in preds_by_match_user:
+        predicted_match_ids_by_user[user_id].add(match_id)
+
+    def _stats(settlements: list[Settlement], multiplier: Decimal = Decimal("1"), predicted_match_ids: set[int] | None = None) -> dict:
+        predicted_match_ids = predicted_match_ids or set()
         correct = sum(1 for s in settlements if s.correct)
-        wrong = sum(1 for s in settlements if not s.correct)
         played = len(settlements)
+        wrong = sum(1 for s in settlements if not s.correct and s.match_id in predicted_match_ids)
+        predicted = correct + wrong
+        no_pred = played - predicted
+        miss_pct = round(wrong / predicted * 100) if predicted else 0
         raw_net = sum((s.amount for s in settlements if s.amount is not None), Decimal(0))
         net = (raw_net * multiplier).quantize(Decimal("0.01"))
         win_pct = round(correct / played * 100) if played else 0
-        return {"correct": correct, "wrong": wrong, "played": played, "net": net, "win_pct": win_pct}
+        return {"correct": correct, "wrong": wrong, "no_pred": no_pred, "played": played, "net": net, "win_pct": win_pct, "miss_pct": miss_pct}
 
     standings = sorted(
-        [{"user": u, **_stats(by_user.get(u.id, []), multiplier_by_user.get(u.id, Decimal("1")))} for u in members],
+        [{"user": u, **_stats(by_user.get(u.id, []), multiplier_by_user.get(u.id, Decimal("1")), predicted_match_ids_by_user.get(u.id))} for u in members],
         key=lambda x: (x["win_pct"], x["played"], x["net"]),
         reverse=True,
     )
@@ -171,7 +180,7 @@ async def scoreboard(
     for label in sorted(round_kickoff, key=lambda r: round_kickoff[r], reverse=True):
         user_stats = sorted(
             [
-                {"user": u, **_stats(round_settlements[label].get(u.id, []), multiplier_by_user.get(u.id, Decimal("1")))}
+                {"user": u, **_stats(round_settlements[label].get(u.id, []), multiplier_by_user.get(u.id, Decimal("1")), predicted_match_ids_by_user.get(u.id))}
                 for u in members
                 if round_settlements[label].get(u.id)  # only show eligible members
             ],

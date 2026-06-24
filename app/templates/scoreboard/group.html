@@ -91,18 +91,20 @@
   </div>
   {% if standings %}
   <div class="overflow-x-auto">
-  <table class="w-full text-sm">
+  <table class="w-full text-sm" data-sortable>
     <thead class="text-xs uppercase tracking-wide text-gray-400 border-b">
       <tr>
         <th class="text-left px-3 py-3 w-6">#</th>
-        <th class="text-left px-3 py-3">Player</th>
-        <th class="text-center px-2 py-3">P</th>
-        <th class="text-center px-2 py-3">✓</th>
-        <th class="text-center px-2 py-3">✗</th>
-        <th class="text-center px-2 py-3">✓%</th>
-        <th class="text-center px-2 py-3">Mult</th>
+        <th class="text-left px-3 py-3 cursor-pointer select-none hover:text-gray-600" data-sort>Player</th>
+        <th class="text-center px-2 py-3 cursor-pointer select-none hover:text-gray-600" data-sort>P</th>
+        <th class="text-center px-2 py-3 cursor-pointer select-none hover:text-gray-600" data-sort>✓</th>
+        <th class="text-center px-2 py-3 cursor-pointer select-none hover:text-gray-600" data-sort>✗</th>
+        <th class="text-center px-2 py-3 cursor-pointer select-none hover:text-gray-600" data-sort>✓%</th>
+        <th class="text-center px-2 py-3 cursor-pointer select-none hover:text-gray-600" data-sort>✗%</th>
+        <th class="text-center px-2 py-3 cursor-pointer select-none hover:text-gray-600" data-sort>∅</th>
+        <th class="text-center px-2 py-3 cursor-pointer select-none hover:text-gray-600" data-sort>Mult</th>
         {% if wagers_by_round %}
-        <th class="text-right px-3 py-3">Net</th>
+        <th class="text-right px-3 py-3 cursor-pointer select-none hover:text-gray-600" data-sort>Net</th>
         {% endif %}
         {% if group.owner_id == current_user.id %}
         <th class="px-2 py-3"></th>
@@ -114,7 +116,7 @@
       {% set m = multiplier_by_user.get(s.user.id, 1) %}
       <tr class="{% if s.user.id == current_user.id %}bg-green-50{% else %}hover:bg-gray-50{% endif %}">
         <td class="px-3 py-3 text-gray-400 font-mono">{{ loop.index }}</td>
-        <td class="px-3 py-3 font-medium">
+        <td class="px-3 py-3 font-medium" data-val="{{ s.user.name }}">
           {{ s.user.name }}
           {% if s.user.id == current_user.id %}
             <span class="text-xs text-gray-400 font-normal ml-1">(you)</span>
@@ -138,7 +140,13 @@
         <td class="px-2 py-3 text-center text-green-600">
           {% if s.played %}{{ s.win_pct }}%{% else %}<span class="text-gray-300">—</span>{% endif %}
         </td>
+        <td class="px-2 py-3 text-center text-red-400">
+          {% if s.miss_pct > 0 %}{{ s.miss_pct }}%{% else %}<span class="text-gray-300">—</span>{% endif %}
+        </td>
         <td class="px-2 py-3 text-center">
+          {% if s.no_pred > 0 %}<span class="text-red-400">{{ s.no_pred }}</span>{% else %}<span class="text-gray-200">0</span>{% endif %}
+        </td>
+        <td class="px-2 py-3 text-center" data-val="{{ "%.10g" % (m|float) }}">
           {% if group.owner_id == current_user.id %}
             <form method="post" action="/groups/{{ group.id }}/members/{{ s.user.id }}/set-multiplier"
                   class="flex items-center justify-center gap-1">
@@ -153,10 +161,7 @@
           {% endif %}
         </td>
         {% if wagers_by_round %}
-        <td class="px-3 py-3 text-right font-mono font-semibold
-          {% if s.net > 0 %}text-green-600
-          {% elif s.net < 0 %}text-red-500
-          {% else %}text-gray-400{% endif %}">
+        <td class="px-3 py-3 text-right font-mono font-semibold {% if s.net > 0 %}text-green-600{% elif s.net < 0 %}text-red-500{% else %}text-gray-400{% endif %}" data-val="{{ s.net|float }}">
           {% if s.net > 0 %}+{% endif %}{{ "%.10g" % (s.net|float) }}
         </td>
         {% endif %}
@@ -178,7 +183,7 @@
     {% if wagers_by_round %}
     <tfoot>
       <tr class="border-t-2 border-gray-200 bg-gray-50">
-        <td colspan="7" class="px-3 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wide">Pool total</td>
+        <td colspan="9" class="px-3 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wide">Pool total</td>
         <td class="px-3 py-2.5 text-right font-mono font-bold
           {% if pool_total > 0 %}text-green-600
           {% elif pool_total < 0 %}text-red-500
@@ -308,18 +313,20 @@
     <span class="text-sm font-semibold text-gray-600">{{ round.label }}</span>
   </summary>
   <div class="overflow-x-auto">
-  <table class="w-full text-sm">
+  <table class="w-full text-sm" data-sortable>
     <thead class="text-xs uppercase tracking-wide text-gray-400 border-b">
       <tr>
         <th class="text-left px-3 py-2 w-6">#</th>
-        <th class="text-left px-3 py-2">Player</th>
-        <th class="text-center px-2 py-2">P</th>
-        <th class="text-center px-2 py-2">✓</th>
-        <th class="text-center px-2 py-2">✗</th>
-        <th class="text-center px-2 py-2">✓%</th>
-        <th class="text-center px-2 py-2">Mult</th>
+        <th class="text-left px-3 py-2 cursor-pointer select-none hover:text-gray-600" data-sort>Player</th>
+        <th class="text-center px-2 py-2 cursor-pointer select-none hover:text-gray-600" data-sort>P</th>
+        <th class="text-center px-2 py-2 cursor-pointer select-none hover:text-gray-600" data-sort>✓</th>
+        <th class="text-center px-2 py-2 cursor-pointer select-none hover:text-gray-600" data-sort>✗</th>
+        <th class="text-center px-2 py-2 cursor-pointer select-none hover:text-gray-600" data-sort>✓%</th>
+        <th class="text-center px-2 py-2 cursor-pointer select-none hover:text-gray-600" data-sort>✗%</th>
+        <th class="text-center px-2 py-2 cursor-pointer select-none hover:text-gray-600" data-sort>∅</th>
+        <th class="text-center px-2 py-2 cursor-pointer select-none hover:text-gray-600" data-sort>Mult</th>
         {% if wagers_by_round %}
-        <th class="text-right px-3 py-2">Net</th>
+        <th class="text-right px-3 py-2 cursor-pointer select-none hover:text-gray-600" data-sort>Net</th>
         {% endif %}
       </tr>
     </thead>
@@ -328,7 +335,7 @@
       {% set m = multiplier_by_user.get(s.user.id, 1) %}
       <tr class="{% if s.user.id == current_user.id %}bg-green-50{% else %}hover:bg-gray-50{% endif %}">
         <td class="px-3 py-2 text-gray-400 font-mono">{{ loop.index }}</td>
-        <td class="px-3 py-2 font-medium">
+        <td class="px-3 py-2 font-medium" data-val="{{ s.user.name }}">
           {{ s.user.name }}
           {% if s.user.id == current_user.id %}<span class="text-xs text-gray-400 font-normal ml-1">(you)</span>{% endif %}
         </td>
@@ -347,12 +354,17 @@
           {% else %}text-green-200{% endif %}">
           {% if s.played %}{{ s.win_pct }}%{% else %}<span class="text-gray-300">—</span>{% endif %}
         </td>
+        <td class="px-2 py-2 text-center text-red-400">
+          {% if s.miss_pct > 0 %}{{ s.miss_pct }}%{% else %}<span class="text-gray-300">—</span>{% endif %}
+        </td>
         <td class="px-2 py-2 text-center">
+          {% if s.no_pred > 0 %}<span class="text-red-400">{{ s.no_pred }}</span>{% else %}<span class="text-gray-200">0</span>{% endif %}
+        </td>
+        <td class="px-2 py-2 text-center" data-val="{{ "%.10g" % (m|float) }}">
           <span class="text-xs {% if m != 1 %}text-purple-500 font-semibold{% else %}text-gray-300{% endif %}">{{ "%.10g" % (m|float) }}</span>
         </td>
         {% if wagers_by_round %}
-        <td class="px-3 py-2 text-right font-mono font-semibold
-          {% if s.net > 0 %}text-green-600{% elif s.net < 0 %}text-red-500{% else %}text-gray-400{% endif %}">
+        <td class="px-3 py-2 text-right font-mono font-semibold {% if s.net > 0 %}text-green-600{% elif s.net < 0 %}text-red-500{% else %}text-gray-400{% endif %}" data-val="{{ s.net|float }}">
           {% if s.net > 0 %}+{% endif %}{{ "%.10g" % (s.net|float) }}
         </td>
         {% endif %}
@@ -469,5 +481,48 @@
 {% endfor %}
 {% if ns.current_round %}</div></details>{% endif %}
 {% endif %}
+
+<script>
+(function () {
+  function cellVal(row, idx) {
+    const td = row.cells[idx];
+    if (!td) return null;
+    const raw = (td.dataset.val !== undefined ? td.dataset.val : td.textContent).trim();
+    if (!raw || raw === '—') return null;
+    const n = parseFloat(raw.replace(/[+%,\s]/g, ''));
+    return isNaN(n) ? raw.toLowerCase() : n;
+  }
+
+  function initSortable(table) {
+    const ths = [...table.querySelectorAll('thead th')];
+    ths.forEach((th, colIdx) => {
+      if (!th.hasAttribute('data-sort')) return;
+      let dir = null;
+      th.addEventListener('click', () => {
+        dir = dir === 'desc' ? 'asc' : 'desc';
+        ths.forEach(h => { delete h.dataset.dir; h.querySelector('.sort-icon')?.remove(); });
+        th.dataset.dir = dir;
+        const icon = document.createElement('span');
+        icon.className = 'sort-icon ml-0.5 opacity-50 text-xs';
+        icon.textContent = dir === 'asc' ? '↑' : '↓';
+        th.appendChild(icon);
+        const tbody = table.querySelector('tbody');
+        const rows = [...tbody.querySelectorAll('tr')];
+        rows.sort((a, b) => {
+          const av = cellVal(a, colIdx), bv = cellVal(b, colIdx);
+          if (av === null && bv === null) return 0;
+          if (av === null) return 1;
+          if (bv === null) return -1;
+          const cmp = typeof av === 'string' ? av.localeCompare(bv) : av - bv;
+          return dir === 'asc' ? cmp : -cmp;
+        });
+        rows.forEach(r => tbody.appendChild(r));
+      });
+    });
+  }
+
+  document.querySelectorAll('table[data-sortable]').forEach(initSortable);
+})();
+</script>
 
 {% endblock %}
