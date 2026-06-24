@@ -209,7 +209,7 @@ Win and loss amounts are independent — you can set asymmetric wagers (e.g. win
 Each group has a scoreboard at `/groups/{id}/scoreboard` showing:
 
 - **Reminder to vote for upcoming games** — collapsible section at the top. Amber with warning icon if any group member hasn't predicted for a match starting within 24h; neutral gray ("Everyone has voted for upcoming games") once all predictions are in. Hidden when no matches are upcoming.
-- **Overall standings** — cumulative correct/wrong/net for each member, ranked by correct predictions then net. Includes a per-member multiplier column (editable by group owner, read-only for others) applied to the net amount.
+- **Overall standings** — cumulative stats per member, ranked by win % then net. Columns: P (played) · ✓ (correct) · ✗ (wrong prediction, excludes auto-losses) · ✓% (win rate) · ✗% (miss rate — wrong as % of predicted) · ∅ (no prediction / auto-loss) · Mult · Net. Click any column header to sort. Mult is editable by the group owner.
 - **Wager settings** — editable by group owner (win/loss amounts per round); read-only view for other members.
 - **Standings By Round** — per-round standings (collapsible), same columns
 - **Group Members' Prediction History by Match** — settled matches grouped by round (collapsible), showing each member's pick, outcome, and amount
