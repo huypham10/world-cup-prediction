@@ -27,7 +27,7 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Optional
 
-from sqlalchemy import or_, select
+from sqlalchemy import and_, or_, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -160,10 +160,32 @@ async def settle(db: AsyncSession) -> None:
         )
 
 
+async def _sync_needed(db: AsyncSession) -> bool:
+    """Return True if there is anything worth syncing right now: a live match,
+    an unsettled finished match, or a scheduled match kicking off within the hour."""
+    now = datetime.now(timezone.utc)
+    result = await db.execute(
+        select(Match.id)
+        .where(
+            Match.league_id == settings.FOOTBALL_LEAGUE_ID,
+            or_(
+                Match.status.like("live%"),
+                and_(Match.status == "finished", Match.settled.is_(False)),
+                and_(Match.status == "scheduled", Match.kickoff_time <= now + timedelta(hours=1)),
+            ),
+        )
+        .limit(1)
+    )
+    return result.scalar_one_or_none() is not None
+
+
 async def sync() -> None:
     """Run fixture sync. Automatically triggers settlement if any match became finished."""
     logger.info("sync: starting")
     async with AsyncSessionLocal() as db:
+        if not await _sync_needed(db):
+            logger.info("sync: no active matches — skipping")
+            return
         client = _make_client()
         new_fixtures, newly_finished = await sync_fixtures(db, client, settings.round_date_rules or None)
         logger.info("sync: %d new/updated fixtures, %d newly finished", new_fixtures, newly_finished)
