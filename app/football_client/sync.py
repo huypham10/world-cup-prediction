@@ -124,6 +124,9 @@ async def sync_fixtures(
         knockout = _is_knockout(f)
 
         if match:
+            match.team_a = f.team_a
+            match.team_b = f.team_b
+            match.kickoff_time = f.kickoff_time
             match.status = f.status
             match.score_a = f.score_a
             match.score_b = f.score_b
