@@ -208,11 +208,12 @@ async def _sync_needed(db: AsyncSession) -> bool:
     return result.scalar_one_or_none() is not None
 
 
-async def sync() -> None:
-    """Run fixture sync. Automatically triggers settlement if any match became finished."""
-    logger.info("sync: starting")
+async def sync(force: bool = False) -> None:
+    """Run fixture sync. Automatically triggers settlement if any match became finished.
+    Pass force=True to bypass the _sync_needed check."""
+    logger.info("sync: starting%s", " (forced)" if force else "")
     async with AsyncSessionLocal() as db:
-        if not await _sync_needed(db):
+        if not force and not await _sync_needed(db):
             logger.info("sync: no active matches — skipping")
             return
         client = _make_client()

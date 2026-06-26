@@ -31,11 +31,13 @@ async def trigger_poll(
 async def trigger_sync(
     background_tasks: BackgroundTasks,
     x_task_secret: str = Header(..., alias="X-Task-Secret"),
+    force: bool = False,
 ):
-    """Fetch and upsert fixtures from the football API only. No settlement."""
+    """Fetch and upsert fixtures from the football API only. No settlement.
+    Pass ?force=true to bypass the active-match check."""
     if x_task_secret != settings.TASK_SECRET:
         raise HTTPException(status_code=401, detail="Invalid task secret")
-    background_tasks.add_task(sync_run)
+    background_tasks.add_task(sync_run, force)
     return {"status": "accepted"}
 
 
