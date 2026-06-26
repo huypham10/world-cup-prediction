@@ -1,6 +1,6 @@
 # World Cup Prediction Pool
 
-A small web app for friends to predict the 90-minute outcome of World Cup matches — Team A win, Team B win, or Draw. Wrong prediction = forfeit the round wager; correct = keep it. The app is a **tracker only**: it shows who owes what, real money is settled offline.
+A small web app for friends to predict World Cup matches. For group stage matches, predict the 90-minute result (Team A win, Team B win, or Draw). For knockout matches, make two independent predictions: the 90-minute result and the eventual winner (after ET / penalties if needed). Wrong prediction = forfeit the round wager; correct = keep it. The app is a **tracker only**: it shows who owes what, real money is settled offline.
 
 App has been deployed using Neon and Railway: https://world-cup-prediction-production.up.railway.app/
 
@@ -10,7 +10,9 @@ App has been deployed using Neon and Railway: https://world-cup-prediction-produ
 
 - Each person has one account. They predict once per match, and that prediction counts across every group they're in.
 - Predictions lock at kickoff — the server enforces this, no client tricks accepted.
-- Groups have configurable per-round wagers (separate win and loss amounts per tournament phase). A group owner shares an 8-character join code; anyone with it can join.
+- **Group stage**: one prediction per match (90-min result). Counts as 1 match in standings.
+- **Knockout matches**: two independent predictions per match — 90-minute result and eventual winner. Each counts as 0.5 in standings (so one knockout match = 1 combined). If you pick a team to win in 90 minutes, the eventual winner is auto-set to the same team (no ET/penalties possible). Only a draw pick unlocks the eventual winner choice.
+- Groups have configurable per-round wagers (separate win/loss amounts for 90-min and eventual winner predictions). A group owner shares an 8-character join code; anyone with it can join.
 - A background task fetches live match results and runs settlement automatically. One finished match can settle differently in each group depending on who was a member and what wagers are set.
 
 ## Architecture
@@ -20,8 +22,8 @@ Two decoupled pieces sharing one Postgres database (Neon, free tier, scale-to-ze
 ```
 ┌─────────────────────┐        ┌──────────────────────────────┐
 │  Web app (FastAPI)  │        │  Poll-and-settle task         │
-│  Serves pages       │  ───▶  │  Runs every 20 min via        │
-│  Takes predictions  │  (DB)  │  GitHub Actions → POST /tasks/poll │
+│  Serves pages       │  ───▶  │  Triggered by cron-job.org   │
+│  Takes predictions  │  (DB)  │  → POST /tasks/sync           │
 │  Shows scoreboard   │        │  Fetches fixtures, settles    │
 └─────────────────────┘        └──────────────────────────────┘
             │                              │
@@ -185,7 +187,9 @@ The workflow at [.github/workflows/poll.yml](.github/workflows/poll.yml) is kept
 
 - **Kickoff lock** — the server checks `match.kickoff_time <= now` before accepting any prediction. The client is never trusted for this.
 - **Late joiners** — a member who made a prediction before joining the group always has that prediction count. A member with no prediction who joined after kickoff is excluded by default; group owners can toggle this to count those as losses instead.
-- **No prediction = auto loss** — if a member has no prediction when a match finishes, the settlement records a loss for that match.
+- **No prediction = auto loss** — if a member has no prediction when a match finishes, the settlement records a loss for that match. For knockout matches, no eventual winner pick is also an auto loss for that half.
+- **Knockout consistency** — the server enforces that if you predict a team to win in 90 minutes, their eventual winner pick is auto-set to the same team. Only a draw pick unlocks the eventual winner choice.
+- **Knockout scoring** — each knockout match generates two settlement rows (90-min and eventual winner), each weighted 0.5, computed in the app rather than stored.
 - **Idempotency** — the settlement task uses `INSERT ... ON CONFLICT DO NOTHING` and the `match.settled` flag, so running it twice on the same match produces no duplicate rows.
 
 ## Wager settings
@@ -204,12 +208,14 @@ Each group has per-round wagers set by the owner on the scoreboard page. Rounds 
 
 Win and loss amounts are independent — you can set asymmetric wagers (e.g. win 10, lose 5). Leave a round blank for no wager on that round. Changes only affect future settlements; use "Re-settle" to retroactively apply new wagers.
 
+Knockout rounds have two additional columns — **Final ✓** and **Final ✗** — for the eventual winner prediction. These can differ from the 90-min amounts. Leave them blank for no wager on the eventual winner.
+
 ## Scoreboard
 
 Each group has a scoreboard at `/groups/{id}/scoreboard` showing:
 
 - **Reminder to vote for upcoming games** — collapsible section at the top. Amber with warning icon if any group member hasn't predicted for a match starting within 24h; neutral gray ("Everyone has voted for upcoming games") once all predictions are in. Hidden when no matches are upcoming.
-- **Overall standings** — cumulative stats per member, ranked by win % then net. Columns: P (played) · ✓ (correct) · ✗ (wrong prediction, excludes auto-losses) · ✓% (win rate) · ✗% (miss rate — wrong as % of predicted) · ∅ (no prediction / auto-loss) · Mult · Net. Click any column header to sort. Mult is editable by the group owner.
+- **Overall standings** — cumulative stats per member, ranked by win % then net. Columns: P (played) · ✓ (correct) · ✗ (wrong prediction, excludes auto-losses) · ✓% (win rate) · ✗% (miss rate — wrong as % of predicted) · ∅ (no prediction / auto-loss) · Mult · Net. Click any column header to sort. Mult is editable by the group owner. Knockout matches each count as 0.5 per prediction type, so a full knockout match (90-min + eventual winner) contributes 1 to P.
 - **Wager settings** — editable by group owner (win/loss amounts per round); read-only view for other members.
 - **Standings By Round** — per-round standings (collapsible), same columns
 - **Group Members' Prediction History by Match** — settled matches grouped by round (collapsible), showing each member's pick, outcome, and amount
@@ -223,14 +229,21 @@ Upcoming matches display bookmaker implied probabilities (home % / draw % / away
 ```
 users           — name, pin_hash (bcrypt), failed_attempts, locked_until
 groups          — name, owner_id, join_code, late_join_counts_as_loss
-group_wagers    — group_id, round_name, win_amount, loss_amount
+group_wagers    — group_id, round_name, win_amount, loss_amount,
+                  final_win_amount, final_loss_amount (knockout eventual winner wagers)
 memberships     — group_id, user_id, role (owner/member), joined_at, multiplier
 matches         — team_a, team_b, kickoff_time, status, score_a, score_b, result, settled
                   league_id, round_number, round_name, group_name
                   odds_a, odds_draw, odds_b, odds_fetched_at
-predictions     — user_id, match_id, pick (A/B/draw), locked, created_at, updated_at
+                  et_score_a, et_score_b (extra time goals only, not cumulative)
+                  pk_score_a, pk_score_b (penalty shootout scores)
+                  final_winner ("A" or "B" — computed from 90-min → ET → pens priority)
+predictions     — user_id, match_id, pick (A/B/draw), final_pick (A/B, knockout only)
+                  locked, created_at, updated_at
                   odds_visible (null = no odds on match, true = odds shown, false = odds hidden at decision time)
-settlements     — group_id, user_id, match_id, correct, amount
+settlements     — group_id, user_id, match_id, prediction_type ("90min" or "final"), correct, amount
+                  unique on (group_id, user_id, match_id, prediction_type)
+                  weight (0.5 each for knockout, 1.0 for group stage) is computed in-app, not stored
 site_config     — singleton row (id=1); show_odds (bool, default true)
 ```
 
