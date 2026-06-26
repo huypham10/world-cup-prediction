@@ -35,6 +35,7 @@ from app.config import settings
 from app.database import AsyncSessionLocal
 from app.football_client.client import BzzOiroClient, OddsData
 from app.football_client.sync import sync_fixtures
+from app.football_client.sync import is_knockout_match
 from app.models.group import Group
 from app.models.group_wager import GroupWager
 from app.models.match import Match
@@ -58,10 +59,14 @@ def _round_label(match: Match) -> str:
 
 
 def _wager_amount(
-    wager: Optional[GroupWager], correct: bool
+    wager: Optional[GroupWager], correct: bool, final: bool = False
 ) -> Optional[Decimal]:
     if wager is None:
         return None
+    if final:
+        if correct:
+            return wager.final_win_amount
+        return -wager.final_loss_amount if wager.final_loss_amount is not None else None
     if correct:
         return wager.win_amount
     return -wager.loss_amount if wager.loss_amount is not None else None
@@ -74,6 +79,11 @@ async def _settle_match(
 ) -> int:
     """
     Create Settlement rows for every eligible group member for one finished match.
+
+    Group stage: one row per member (prediction_type="90min").
+    Knockout: two rows per member (prediction_type="90min" and "final"), settled
+    independently. Each counts as 0.5 of a match in the scoreboard.
+
     A member who predicted before kickoff always counts, regardless of when they joined.
     A member who joined late AND has no prediction is excluded (or auto-loss if the
     group's late_join_counts_as_loss toggle is on).
@@ -81,6 +91,7 @@ async def _settle_match(
     """
     now = datetime.now(timezone.utc)
     round_label = _round_label(match)
+    knockout = is_knockout_match(match)
     created = 0
 
     groups_result = await db.execute(select(Group))
@@ -112,23 +123,41 @@ async def _settle_match(
                     continue  # exclude from this match entirely
                 # else: fall through to auto-loss below
 
-            correct = prediction is not None and prediction.pick == match.result
-            amount = _wager_amount(wager, correct)
-
+            # --- 90-minute result ---
+            correct_90 = prediction is not None and prediction.pick == match.result
             stmt = (
                 pg_insert(Settlement)
                 .values(
                     group_id=group.id,
                     user_id=member.user_id,
                     match_id=match.id,
-                    correct=correct,
-                    amount=amount,
+                    prediction_type="90min",
+                    correct=correct_90,
+                    amount=_wager_amount(wager, correct_90, final=False),
                     created_at=now,
                 )
                 .on_conflict_do_nothing()
             )
-            result = await db.execute(stmt)
-            created += result.rowcount
+            created += (await db.execute(stmt)).rowcount
+
+            # --- Final winner (knockout only) ---
+            if knockout:
+                final_pick = prediction.final_pick if prediction else None
+                correct_final = final_pick is not None and final_pick == match.final_winner
+                stmt = (
+                    pg_insert(Settlement)
+                    .values(
+                        group_id=group.id,
+                        user_id=member.user_id,
+                        match_id=match.id,
+                        prediction_type="final",
+                        correct=correct_final,
+                        amount=_wager_amount(wager, correct_final, final=True),
+                        created_at=now,
+                    )
+                    .on_conflict_do_nothing()
+                )
+                created += (await db.execute(stmt)).rowcount
 
     return created
 

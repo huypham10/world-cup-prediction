@@ -25,11 +25,15 @@ class FixtureData:
     team_b: str           # away team
     kickoff_time: datetime
     status: str           # "scheduled"|"live"|"live_h1"|"live_ht"|"live_h2"|"live_et"|"live_pk"|"live_aet"|"finished"|"postponed"
-    score_a: Optional[int] = None
+    score_a: Optional[int] = None   # 90-min score (excludes ET/PK)
     score_b: Optional[int] = None
     round_number: Optional[int] = None
     round_name: Optional[str] = None
     group_name: Optional[str] = None
+    et_score_a: Optional[int] = None    # extra time goals only
+    et_score_b: Optional[int] = None
+    pk_score_a: Optional[int] = None    # penalty shootout
+    pk_score_b: Optional[int] = None
 
 
 class FootballClientBase(ABC):
@@ -86,6 +90,8 @@ class BzzOiroClient(FootballClientBase):
     def _parse_event(self, event: dict) -> FixtureData:
         home = event["home_team"]
         away = event["away_team"]
+        et = event.get("extra_time_score") or {}
+        pk = event.get("penalty_shootout") or {}
         return FixtureData(
             external_id=str(event["id"]),
             team_a=home["name"] if isinstance(home, dict) else home,
@@ -97,6 +103,10 @@ class BzzOiroClient(FootballClientBase):
             round_number=event.get("round_number"),
             round_name=event.get("round_name") or None,
             group_name=event.get("group_name"),
+            et_score_a=et.get("home") if et else None,
+            et_score_b=et.get("away") if et else None,
+            pk_score_a=pk.get("home") if pk else None,
+            pk_score_b=pk.get("away") if pk else None,
         )
 
     async def fetch_upcoming_fixtures(self) -> list[FixtureData]:

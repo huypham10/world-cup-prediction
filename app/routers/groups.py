@@ -160,6 +160,8 @@ async def update_wagers(
     round_name: list[str] = Form(...),
     win_amount: list[str] = Form(...),
     loss_amount: list[str] = Form(...),
+    final_win_amount: list[str] = Form(...),
+    final_loss_amount: list[str] = Form(...),
     late_join_counts_as_loss: Optional[str] = Form(None),
     current_user: Optional[User] = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -176,25 +178,29 @@ async def update_wagers(
 
     group.late_join_counts_as_loss = late_join_counts_as_loss == "1"
 
-    for r, w_raw, l_raw in zip(round_name, win_amount, loss_amount):
+    def _parse(raw: str) -> Optional[Decimal]:
+        try:
+            v = Decimal(raw.strip()) if raw.strip() else None
+            return v if v and v > 0 else None
+        except InvalidOperation:
+            return None
+
+    for r, w_raw, l_raw, fw_raw, fl_raw in zip(
+        round_name, win_amount, loss_amount, final_win_amount, final_loss_amount
+    ):
         if r not in TOURNAMENT_ROUNDS:
             continue
-        try:
-            w = Decimal(w_raw.strip()) if w_raw.strip() else None
-            l = Decimal(l_raw.strip()) if l_raw.strip() else None
-            if w is not None and w <= 0:
-                w = None
-            if l is not None and l <= 0:
-                l = None
-        except InvalidOperation:
-            continue
-
+        w, l, fw, fl = _parse(w_raw), _parse(l_raw), _parse(fw_raw), _parse(fl_raw)
         stmt = (
             pg_insert(GroupWager)
-            .values(group_id=group_id, round_name=r, win_amount=w, loss_amount=l)
+            .values(
+                group_id=group_id, round_name=r,
+                win_amount=w, loss_amount=l,
+                final_win_amount=fw, final_loss_amount=fl,
+            )
             .on_conflict_do_update(
                 index_elements=["group_id", "round_name"],
-                set_={"win_amount": w, "loss_amount": l},
+                set_={"win_amount": w, "loss_amount": l, "final_win_amount": fw, "final_loss_amount": fl},
             )
         )
         await db.execute(stmt)
