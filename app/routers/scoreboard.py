@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..auth.dependencies import get_current_user
 from ..config import settings
 from ..database import get_db
+from ..football_client.sync import is_knockout_match
 from ..models.group import Group
 from ..models.group_wager import GroupWager, TOURNAMENT_ROUNDS
 from ..models.match import Match
@@ -107,30 +108,37 @@ async def scoreboard(
             (p.match_id, p.user_id): p for p in preds_result.scalars().all()
         }
 
-        # Index settlements by (match_id, user_id) for match history
-        by_match_user: dict[tuple[int, int], Settlement] = {
-            (s.match_id, s.user_id): s for s in all_settlements
+        # Index settlements by (match_id, user_id, prediction_type) for match history
+        by_match_user_type: dict[tuple[int, int, str], Settlement] = {
+            (s.match_id, s.user_id, s.prediction_type): s for s in all_settlements
         }
 
         for match in settled_matches:
+            knockout = is_knockout_match(match)
             member_results = []
             for user in members:
-                s = by_match_user.get((match.id, user.id))
+                s90 = by_match_user_type.get((match.id, user.id, "90min"))
+                sf = by_match_user_type.get((match.id, user.id, "final"))
                 p = preds_by_match_user.get((match.id, user.id))
-                if s is None:
+                if s90 is None:
                     member_results.append({
-                        "user": user, "pick": None,
-                        "correct": None, "amount": None, "eligible": False,
+                        "user": user, "pick": None, "final_pick": None,
+                        "correct": None, "amount": None,
+                        "final_correct": None, "final_amount": None,
+                        "eligible": False,
                     })
                 else:
                     member_results.append({
                         "user": user,
                         "pick": p.pick if p else None,
-                        "correct": s.correct,
-                        "amount": s.amount,
+                        "final_pick": p.final_pick if p else None,
+                        "correct": s90.correct,
+                        "amount": s90.amount,
+                        "final_correct": sf.correct if sf else None,
+                        "final_amount": sf.amount if sf else None,
                         "eligible": True,
                     })
-            match_rows.append({"match": match, "member_results": member_results})
+            match_rows.append({"match": match, "member_results": member_results, "is_knockout": knockout})
 
     # Overall standings — aggregate across all settlements per user
     by_user: dict[int, list[Settlement]] = {u.id: [] for u in members}
@@ -142,11 +150,18 @@ async def scoreboard(
     for (match_id, user_id) in preds_by_match_user:
         predicted_match_ids_by_user[user_id].add(match_id)
 
+    def _weight(s: Settlement) -> float:
+        """Knockout matches produce two settlement rows (90min + final), each worth 0.5."""
+        if s.prediction_type == "final":
+            return 0.5
+        match = matches_by_id.get(s.match_id)
+        return 0.5 if (match and is_knockout_match(match)) else 1.0
+
     def _stats(settlements: list[Settlement], multiplier: Decimal = Decimal("1"), predicted_match_ids: set[int] | None = None) -> dict:
         predicted_match_ids = predicted_match_ids or set()
-        correct = sum(1 for s in settlements if s.correct)
-        played = len(settlements)
-        wrong = sum(1 for s in settlements if not s.correct and s.match_id in predicted_match_ids)
+        played = sum(_weight(s) for s in settlements)
+        correct = sum(_weight(s) for s in settlements if s.correct)
+        wrong = sum(_weight(s) for s in settlements if not s.correct and s.match_id in predicted_match_ids)
         predicted = correct + wrong
         no_pred = played - predicted
         miss_pct = round(wrong / predicted * 100) if predicted else 0

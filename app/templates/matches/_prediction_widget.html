@@ -2,35 +2,60 @@
   {# Locked state #}
   {% set finished = match.status in ('finished',) and match.result %}
   {% set correct = finished and prediction and prediction.pick == match.result %}
-  <div class="flex items-center gap-2 text-sm text-gray-500">
-    <svg class="w-4 h-4 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-      <path fill-rule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clip-rule="evenodd"/>
-    </svg>
-    {% if not finished %}<span>Locked.</span>{% endif %}
-    {% if prediction %}
-      <span>Your pick:
-        <strong class="font-semibold
+  {% set final_correct = finished and prediction and prediction.final_pick and prediction.final_pick == match.final_winner %}
+  <div class="flex flex-col gap-3 text-sm">
+    {# 90-minute result row #}
+    <div>
+      <p class="text-sm font-semibold text-gray-700 mb-1.5 flex items-center gap-1.5">
+        <svg class="w-4 h-4 text-gray-400 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+          <path fill-rule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clip-rule="evenodd"/>
+        </svg>
+        {% if is_knockout %}90-minute result{% else %}Result{% endif %}
+      </p>
+      {% if prediction %}
+        <span class="text-gray-500">Your pick: </span><span class="font-semibold
           {% if finished %}
             {% if correct %}text-green-600{% else %}text-red-500{% endif %}
           {% else %}
             text-gray-700
           {% endif %}">
-          {% if prediction.pick == 'A' %}
-            {{ match.team_a }} wins
-          {% elif prediction.pick == 'draw' %}
-            Draw
-          {% elif prediction.pick == 'B' %}
-            {{ match.team_b }} wins
+          {% if prediction.pick == 'A' %}{{ match.team_a }} wins
+          {% elif prediction.pick == 'draw' %}Draw
+          {% elif prediction.pick == 'B' %}{{ match.team_b }} wins
           {% endif %}
+          {% if finished %}{% if correct %}✓{% else %}✗{% endif %}{% endif %}
+        </span>
+      {% elif finished %}
+        <span class="text-red-500 font-medium">No prediction — loss</span>
+      {% else %}
+        <span class="text-amber-600 font-medium">No prediction — auto loss</span>
+      {% endif %}
+    </div>
+    {# Final winner row — knockout only #}
+    {% if is_knockout %}
+    <div>
+      <p class="text-sm font-semibold text-gray-700 mb-1.5 flex items-center gap-1.5">
+        <svg class="w-4 h-4 text-gray-400 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+          <path fill-rule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clip-rule="evenodd"/>
+        </svg>
+        Final winner <span class="text-gray-400 font-normal">(after ET / penalties)</span>
+      </p>
+      {% if prediction and prediction.final_pick %}
+        <span class="text-gray-500">Your pick: </span><span class="font-semibold
           {% if finished %}
-            {% if correct %}✓{% else %}✗{% endif %}
-          {% endif %}
-        </strong>
-      </span>
-    {% elif finished %}
-      <span class="text-red-500 font-medium">No prediction — loss</span>
-    {% else %}
-      <span class="text-amber-600 font-medium">No prediction — auto loss</span>
+            {% if final_correct %}text-green-600{% else %}text-red-500{% endif %}
+          {% else %}
+            text-gray-700
+          {% endif %}">
+          {% if prediction.final_pick == 'A' %}{{ match.team_a }}{% else %}{{ match.team_b }}{% endif %}
+          {% if finished %}{% if final_correct %}✓{% else %}✗{% endif %}{% endif %}
+        </span>
+      {% elif finished %}
+        <span class="text-red-500 font-medium">No pick — loss</span>
+      {% else %}
+        <span class="text-amber-600 font-medium">No pick — auto loss</span>
+      {% endif %}
+    </div>
     {% endif %}
   </div>
 {% else %}
@@ -49,8 +74,9 @@
     {% set pct_b = none %}
   {% endif %}
   <form>
+    {# 90-minute result #}
+    <p class="text-sm font-semibold text-gray-700 mb-1.5 {% if is_knockout %}{% else %}hidden{% endif %}">90-minute result</p>
     <div class="flex items-center gap-2">
-      <span class="text-xs text-gray-500 mr-1">Your pick:</span>
       <button
         type="submit"
         name="pick"
@@ -106,5 +132,66 @@
         {% if pct_b %}<span class="odds-pct hidden text-xs opacity-60">{{ pct_b }}%</span>{% endif %}
       </button>
     </div>
+
+    {# Final winner — always shown for knockout matches.
+       Auto-picked (greyed) when 90-min pick is A or B; active buttons when pick is draw. #}
+    {% if is_knockout %}
+    <div class="mt-3 pt-3 border-t border-gray-100">
+      <p class="text-sm font-semibold text-gray-700 mb-1.5">Final winner <span class="text-gray-400 font-normal">(after ET / penalties)</span></p>
+      <div class="flex items-center gap-2">
+          {% if prediction and prediction.pick in ('A', 'B') %}
+          {# Auto-pick: final winner mirrors the 90-min pick, buttons are display-only #}
+          {% for side, team in [('A', match.team_a), ('B', match.team_b)] %}
+            {% if prediction.pick == side %}
+              <div class="flex-1 px-3 py-1.5 rounded border text-sm font-medium text-center flex flex-col items-center
+                           bg-green-50 border-green-200 text-green-600 cursor-default select-none">
+                <span>{{ team }}</span>
+                <span class="text-xs opacity-50">auto</span>
+              </div>
+            {% else %}
+              <div class="flex-1 px-3 py-1.5 rounded border text-sm font-medium text-center
+                           bg-white border-gray-200 text-gray-300 cursor-default select-none">
+                {{ team }}
+              </div>
+            {% endif %}
+          {% endfor %}
+        {% elif prediction and prediction.pick == 'draw' %}
+          {# Draw: user actively picks the eventual winner #}
+          <button
+            type="button"
+            hx-post="/matches/{{ match.id }}/predict"
+            hx-target="#predict-{{ match.id }}"
+            hx-swap="innerHTML"
+            hx-vals='{"pick": "draw", "final_pick": "A"}'
+            class="flex-1 px-3 py-1.5 rounded border text-sm font-medium transition-colors
+              {% if prediction.final_pick == 'A' %}bg-green-600 border-green-600 text-white hover:bg-green-700
+              {% else %}bg-white border-gray-300 text-gray-700 hover:bg-gray-50{% endif %}">
+            {{ match.team_a }}
+          </button>
+          <button
+            type="button"
+            hx-post="/matches/{{ match.id }}/predict"
+            hx-target="#predict-{{ match.id }}"
+            hx-swap="innerHTML"
+            hx-vals='{"pick": "draw", "final_pick": "B"}'
+            class="flex-1 px-3 py-1.5 rounded border text-sm font-medium transition-colors
+              {% if prediction.final_pick == 'B' %}bg-green-600 border-green-600 text-white hover:bg-green-700
+              {% else %}bg-white border-gray-300 text-gray-700 hover:bg-gray-50{% endif %}">
+            {{ match.team_b }}
+          </button>
+        {% else %}
+          {# No 90-min pick yet: both buttons greyed out, none selected #}
+          <div class="flex-1 px-3 py-1.5 rounded border text-sm font-medium text-center
+                       bg-white border-gray-200 text-gray-300 cursor-default select-none">
+            {{ match.team_a }}
+          </div>
+          <div class="flex-1 px-3 py-1.5 rounded border text-sm font-medium text-center
+                       bg-white border-gray-200 text-gray-300 cursor-default select-none">
+            {{ match.team_b }}
+          </div>
+        {% endif %}
+      </div>
+    </div>
+    {% endif %}
   </form>
 {% endif %}

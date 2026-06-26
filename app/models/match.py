@@ -49,6 +49,13 @@ class Match(Base):
     odds_draw: Mapped[Optional[Decimal]] = mapped_column(Numeric(6, 2), nullable=True)
     odds_b: Mapped[Optional[Decimal]] = mapped_column(Numeric(6, 2), nullable=True)
     odds_fetched_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    # Extra time / penalty scores (null when match didn't go to ET/PK)
+    et_score_a: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    et_score_b: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    pk_score_a: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    pk_score_b: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    # Winner after ET/PK for knockout matches; null for group stage or undecided
+    final_winner: Mapped[Optional[str]] = mapped_column(String(10), nullable=True)
 
     # Relationships
     predictions: Mapped[List["Prediction"]] = relationship(back_populates="match")

@@ -122,17 +122,17 @@
             <span class="text-xs text-gray-400 font-normal ml-1">(you)</span>
           {% endif %}
         </td>
-        <td class="px-2 py-3 text-center text-gray-500">{{ s.played }}</td>
+        <td class="px-2 py-3 text-center text-gray-500">{{ "%.10g" % (s.played|float) }}</td>
         <td class="px-2 py-3 text-center">
           {% if s.correct > 0 %}
-            <span class="text-green-600 font-semibold">{{ s.correct }}</span>
+            <span class="text-green-600 font-semibold">{{ "%.10g" % (s.correct|float) }}</span>
           {% else %}
             <span class="text-gray-300">0</span>
           {% endif %}
         </td>
         <td class="px-2 py-3 text-center">
           {% if s.wrong > 0 %}
-            <span class="text-red-500">{{ s.wrong }}</span>
+            <span class="text-red-500">{{ "%.10g" % (s.wrong|float) }}</span>
           {% else %}
             <span class="text-gray-300">0</span>
           {% endif %}
@@ -144,7 +144,7 @@
           {% if s.miss_pct > 0 %}{{ s.miss_pct }}%{% else %}<span class="text-gray-300">—</span>{% endif %}
         </td>
         <td class="px-2 py-3 text-center">
-          {% if s.no_pred > 0 %}<span class="text-red-400">{{ s.no_pred }}</span>{% else %}<span class="text-gray-200">0</span>{% endif %}
+          {% if s.no_pred > 0 %}<span class="text-red-400">{{ "%.10g" % (s.no_pred|float) }}</span>{% else %}<span class="text-gray-200">0</span>{% endif %}
         </td>
         <td class="px-2 py-3 text-center" data-val="{{ "%.10g" % (m|float) }}">
           {% if group.owner_id == current_user.id %}
@@ -213,13 +213,16 @@
       <thead class="text-xs uppercase tracking-wide text-gray-400 border-b">
         <tr>
           <th class="text-left px-5 py-2">Round</th>
-          <th class="text-center px-4 py-2">✓ amount</th>
-          <th class="text-center px-4 py-2">✗ amount</th>
+          <th class="text-center px-4 py-2">90-min ✓</th>
+          <th class="text-center px-4 py-2">90-min ✗</th>
+          <th class="text-center px-4 py-2">Final ✓</th>
+          <th class="text-center px-4 py-2">Final ✗</th>
         </tr>
       </thead>
       <tbody class="divide-y divide-gray-100">
         {% for round in tournament_rounds %}
         {% set wager = wagers_by_round.get(round) %}
+        {% set is_ko = round != 'Group Stage' %}
         <tr>
           <td class="px-5 py-2.5 font-medium text-gray-700">
             <input type="hidden" name="round_name" value="{{ round }}">
@@ -236,6 +239,28 @@
               value="{{ wager.loss_amount if wager and wager.loss_amount is not none else '' }}"
               placeholder="—"
               class="w-20 text-center border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-green-500">
+          </td>
+          <td class="px-4 py-2.5 text-center">
+            {% if is_ko %}
+            <input type="number" name="final_win_amount" min="0" step="0.01"
+              value="{{ wager.final_win_amount if wager and wager.final_win_amount is not none else '' }}"
+              placeholder="—"
+              class="w-20 text-center border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+            {% else %}
+            <span class="text-gray-300 text-xs">—</span>
+            <input type="hidden" name="final_win_amount" value="">
+            {% endif %}
+          </td>
+          <td class="px-4 py-2.5 text-center">
+            {% if is_ko %}
+            <input type="number" name="final_loss_amount" min="0" step="0.01"
+              value="{{ wager.final_loss_amount if wager and wager.final_loss_amount is not none else '' }}"
+              placeholder="—"
+              class="w-20 text-center border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+            {% else %}
+            <span class="text-gray-300 text-xs">—</span>
+            <input type="hidden" name="final_loss_amount" value="">
+            {% endif %}
           </td>
         </tr>
         {% endfor %}
@@ -277,14 +302,17 @@
     <thead class="text-xs uppercase tracking-wide text-gray-400 border-b">
       <tr>
         <th class="text-left px-5 py-2">Round</th>
-        <th class="text-center px-4 py-2">✓</th>
-        <th class="text-center px-4 py-2">✗</th>
+        <th class="text-center px-4 py-2">90-min ✓</th>
+        <th class="text-center px-4 py-2">90-min ✗</th>
+        <th class="text-center px-4 py-2">Final ✓</th>
+        <th class="text-center px-4 py-2">Final ✗</th>
       </tr>
     </thead>
     <tbody class="divide-y divide-gray-100">
       {% for round in tournament_rounds %}
       {% set wager = wagers_by_round.get(round) %}
-      {% if wager and (wager.win_amount is not none or wager.loss_amount is not none) %}
+      {% if wager and (wager.win_amount is not none or wager.loss_amount is not none or wager.final_win_amount is not none or wager.final_loss_amount is not none) %}
+      {% set is_ko = round != 'Group Stage' %}
       <tr>
         <td class="px-5 py-2 text-gray-700 font-medium">{{ round }}</td>
         <td class="px-4 py-2 text-center font-mono text-green-600">
@@ -292,6 +320,12 @@
         </td>
         <td class="px-4 py-2 text-center font-mono text-red-400">
           {{ "%.10g" % (wager.loss_amount|float) if wager.loss_amount is not none else '—' }}
+        </td>
+        <td class="px-4 py-2 text-center font-mono text-green-600">
+          {% if is_ko %}{{ "%.10g" % (wager.final_win_amount|float) if wager.final_win_amount is not none else '—' }}{% else %}<span class="text-gray-300">—</span>{% endif %}
+        </td>
+        <td class="px-4 py-2 text-center font-mono text-red-400">
+          {% if is_ko %}{{ "%.10g" % (wager.final_loss_amount|float) if wager.final_loss_amount is not none else '—' }}{% else %}<span class="text-gray-300">—</span>{% endif %}
         </td>
       </tr>
       {% endif %}
@@ -339,13 +373,13 @@
           {{ s.user.name }}
           {% if s.user.id == current_user.id %}<span class="text-xs text-gray-400 font-normal ml-1">(you)</span>{% endif %}
         </td>
-        <td class="px-2 py-2 text-center text-gray-500">{{ s.played }}</td>
+        <td class="px-2 py-2 text-center text-gray-500">{{ "%.10g" % (s.played|float) }}</td>
         <td class="px-2 py-2 text-center">
-          {% if s.correct > 0 %}<span class="text-green-600 font-semibold">{{ s.correct }}</span>
+          {% if s.correct > 0 %}<span class="text-green-600 font-semibold">{{ "%.10g" % (s.correct|float) }}</span>
           {% else %}<span class="text-gray-300">0</span>{% endif %}
         </td>
         <td class="px-2 py-2 text-center">
-          {% if s.wrong > 0 %}<span class="text-red-500">{{ s.wrong }}</span>
+          {% if s.wrong > 0 %}<span class="text-red-500">{{ "%.10g" % (s.wrong|float) }}</span>
           {% else %}<span class="text-gray-300">0</span>{% endif %}
         </td>
         <td class="px-2 py-2 text-center font-mono text-sm
@@ -358,7 +392,7 @@
           {% if s.miss_pct > 0 %}{{ s.miss_pct }}%{% else %}<span class="text-gray-300">—</span>{% endif %}
         </td>
         <td class="px-2 py-2 text-center">
-          {% if s.no_pred > 0 %}<span class="text-red-400">{{ s.no_pred }}</span>{% else %}<span class="text-gray-200">0</span>{% endif %}
+          {% if s.no_pred > 0 %}<span class="text-red-400">{{ "%.10g" % (s.no_pred|float) }}</span>{% else %}<span class="text-gray-200">0</span>{% endif %}
         </td>
         <td class="px-2 py-2 text-center" data-val="{{ "%.10g" % (m|float) }}">
           <span class="text-xs {% if m != 1 %}text-purple-500 font-semibold{% else %}text-gray-300{% endif %}">{{ "%.10g" % (m|float) }}</span>
@@ -431,7 +465,12 @@
     <div class="px-5 py-3 border-b flex items-center justify-between">
       <div class="flex items-center gap-3">
         <span class="font-semibold text-gray-800">{{ match.team_a }}</span>
-        <span class="font-bold tabular-nums text-gray-700">{{ match.score_a }} – {{ match.score_b }}</span>
+        <div class="text-center">
+          <span class="font-bold tabular-nums text-gray-700">{{ match.score_a }} – {{ match.score_b }}</span>
+          {% if match.et_score_a is not none %}
+            <span class="text-xs text-gray-400 ml-1">(ET {{ match.score_a + match.et_score_a }}–{{ match.score_b + match.et_score_b }}{% if match.pk_score_a is not none %}, PK {{ match.pk_score_a }}–{{ match.pk_score_b }}{% endif %})</span>
+          {% endif %}
+        </div>
         <span class="font-semibold text-gray-800">{{ match.team_b }}</span>
       </div>
       <div class="flex items-center gap-2 text-xs text-gray-400">
@@ -443,6 +482,11 @@
           {% elif match.result == 'B' %}{{ match.team_b }} win
           {% else %}Draw{% endif %}
         </span>
+        {% if match.final_winner %}
+          <span class="px-2 py-0.5 rounded-full bg-blue-50 text-blue-500 font-medium">
+            Final: {% if match.final_winner == 'A' %}{{ match.team_a }}{% else %}{{ match.team_b }}{% endif %}
+          </span>
+        {% endif %}
       </div>
     </div>
     <div class="divide-y divide-gray-50">
@@ -456,21 +500,45 @@
           <span class="text-xs text-gray-300 italic">No prediction before kickoff</span>
         {% else %}
           <div class="flex items-center gap-3">
-            <span class="text-gray-500">
-              {% if mr.pick == 'A' %}{{ match.team_a }} win
-              {% elif mr.pick == 'B' %}{{ match.team_b }} win
-              {% elif mr.pick == 'draw' %}Draw
-              {% else %}<span class="italic text-gray-300">No prediction</span>{% endif %}
-            </span>
-            {% if mr.correct %}
-              <span class="text-green-600 font-semibold text-xs">✓ Correct</span>
-            {% else %}
-              <span class="text-red-400 text-xs">✗ Wrong</span>
-            {% endif %}
+            {# 90-min pick #}
+            <div class="flex items-center gap-1">
+              <span class="text-gray-500">
+                {% if mr.pick == 'A' %}{{ match.team_a }} win
+                {% elif mr.pick == 'B' %}{{ match.team_b }} win
+                {% elif mr.pick == 'draw' %}Draw
+                {% else %}<span class="italic text-gray-300">No pick</span>{% endif %}
+              </span>
+              {% if mr.correct %}
+                <span class="text-green-600 font-semibold text-xs">✓</span>
+              {% else %}
+                <span class="text-red-400 text-xs">✗</span>
+              {% endif %}
+            </div>
             {% if mr.amount is not none %}
               <span class="font-mono text-xs font-semibold w-12 text-right {% if mr.amount > 0 %}text-green-600{% else %}text-red-400{% endif %}">
                 {% if mr.amount > 0 %}+{% endif %}{{ "%.10g" % (mr.amount|float) }}
               </span>
+            {% endif %}
+            {# Final winner pick (knockout only) #}
+            {% if row.is_knockout and match.final_winner %}
+              <span class="text-gray-300 text-xs">|</span>
+              <div class="flex items-center gap-1">
+                <span class="text-gray-400 text-xs">
+                  {% if mr.final_pick == 'A' %}{{ match.team_a }}
+                  {% elif mr.final_pick == 'B' %}{{ match.team_b }}
+                  {% else %}<span class="italic text-gray-300">No pick</span>{% endif %}
+                </span>
+                {% if mr.final_correct %}
+                  <span class="text-green-600 font-semibold text-xs">✓</span>
+                {% elif mr.final_correct is not none %}
+                  <span class="text-red-400 text-xs">✗</span>
+                {% endif %}
+              </div>
+              {% if mr.final_amount is not none %}
+                <span class="font-mono text-xs font-semibold w-12 text-right {% if mr.final_amount > 0 %}text-green-600{% else %}text-red-400{% endif %}">
+                  {% if mr.final_amount > 0 %}+{% endif %}{{ "%.10g" % (mr.final_amount|float) }}
+                </span>
+              {% endif %}
             {% endif %}
           </div>
         {% endif %}

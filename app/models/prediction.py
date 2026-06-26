@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
 from sqlalchemy import Boolean, DateTime, ForeignKey, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -28,6 +28,8 @@ class Prediction(Base):
     )
     # "A", "B", or "draw"
     pick: Mapped[str] = mapped_column(String(10), nullable=False)
+    # "A" or "B" — knockout final winner prediction; null for group stage or not submitted
+    final_pick: Mapped[Optional[str]] = mapped_column(String(10), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,

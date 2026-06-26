@@ -12,7 +12,7 @@ from ..auth.dependencies import get_current_user
 from ..config import settings
 from ..database import get_db
 from ..football_client.client import BzzOiroClient
-from ..football_client.sync import sync_fixtures
+from ..football_client.sync import is_knockout_match, sync_fixtures
 from ..models.match import Match
 from ..models.prediction import Prediction
 from ..models.user import User
@@ -67,6 +67,7 @@ async def matches_list(
             "match": m,
             "prediction": predictions.get(m.id),
             "locked": m.kickoff_time <= now or m.status == "finished" or m.status.startswith("live"),
+            "is_knockout": is_knockout_match(m),
         }
         for m in matches
     ]
@@ -102,7 +103,8 @@ async def sync_matches(
 async def submit_prediction(
     request: Request,
     match_id: int,
-    pick: str = Form(...),
+    pick: Optional[str] = Form(None),
+    final_pick: Optional[str] = Form(None),
     odds_visible: Optional[str] = Form(None),
     current_user: Optional[User] = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -110,8 +112,10 @@ async def submit_prediction(
     if not current_user:
         return RedirectResponse("/login", status_code=302)
 
-    if pick not in ("A", "B", "draw"):
+    if pick is not None and pick not in ("A", "B", "draw"):
         raise HTTPException(status_code=422, detail="Invalid pick value")
+    if final_pick is not None and final_pick not in ("A", "B"):
+        raise HTTPException(status_code=422, detail="Invalid final_pick value")
 
     match = await db.get(Match, match_id)
     if not match:
@@ -122,6 +126,16 @@ async def submit_prediction(
     if locked:
         raise HTTPException(status_code=409, detail="Predictions are locked after kickoff")
 
+    knockout = is_knockout_match(match)
+
+    # Consistency rule: if pick is A or B (outright win), final winner is the same team automatically.
+    # Only a draw in 90 min leads to ET/PK where the user chooses the final winner.
+    if not knockout:
+        final_pick = None
+    elif pick in ("A", "B"):
+        final_pick = pick  # auto-set; no ET/PK possible if one team wins outright
+    # if pick == "draw" or pick is None: keep user-submitted final_pick as-is
+
     # Upsert prediction
     result = await db.execute(
         select(Prediction).where(
@@ -131,11 +145,26 @@ async def submit_prediction(
     )
     pred = result.scalar_one_or_none()
     ov = (odds_visible == "true") if odds_visible is not None else None
-    if pred:
+
+    if pick is None:
+        # Final-pick-only update — existing prediction required
+        if not pred:
+            raise HTTPException(status_code=422, detail="Place a 90-min pick first")
+        if final_pick is not None:
+            pred.final_pick = final_pick
+    elif pred:
         pred.pick = pick
-        pred.odds_visible = ov
+        pred.final_pick = final_pick
+        if ov is not None:
+            pred.odds_visible = ov
     else:
-        pred = Prediction(user_id=current_user.id, match_id=match_id, pick=pick, odds_visible=ov)
+        pred = Prediction(
+            user_id=current_user.id,
+            match_id=match_id,
+            pick=pick,
+            final_pick=final_pick,
+            odds_visible=ov,
+        )
         db.add(pred)
     await db.commit()
     await db.refresh(pred)
@@ -153,6 +182,7 @@ async def submit_prediction(
                 "prediction": pred,
                 "locked": False,
                 "show_odds": config.show_odds,
+                "is_knockout": knockout,
             },
         )
     return RedirectResponse("/matches", status_code=302)
