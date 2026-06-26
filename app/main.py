@@ -2,6 +2,11 @@ from contextlib import asynccontextmanager
 from typing import Optional
 import logging
 
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(name)s %(message)s",
+)
+
 from fastapi import Depends, FastAPI, Request
 from fastapi.responses import RedirectResponse
 from slowapi import _rate_limit_exceeded_handler
