@@ -230,15 +230,25 @@ async def scoreboard(
     if upcoming_matches and member_ids:
         upcoming_ids = [m.id for m in upcoming_matches]
         voted_result = await db.execute(
-            select(Prediction.match_id, Prediction.user_id).where(
+            select(Prediction.match_id, Prediction.user_id, Prediction.final_pick).where(
                 Prediction.match_id.in_(upcoming_ids),
                 Prediction.user_id.in_(member_ids),
             )
         )
-        voted: set[tuple[int, int]] = {(r.match_id, r.user_id) for r in voted_result}
+        # Map (match_id, user_id) → final_pick (None if not predicted or no final pick)
+        upcoming_preds: dict[tuple[int, int], str | None] = {
+            (r.match_id, r.user_id): r.final_pick for r in voted_result
+        }
         for match in upcoming_matches:
-            missing = [u for u in members if (match.id, u.id) not in voted]
-            non_voters_by_match.append({"match": match, "non_voters": missing})
+            knockout = is_knockout_match(match)
+            missing = []
+            for u in members:
+                pred = upcoming_preds.get((match.id, u.id))
+                if pred is None and (match.id, u.id) not in upcoming_preds:
+                    missing.append(u)  # no prediction at all
+                elif knockout and upcoming_preds.get((match.id, u.id)) is None and (match.id, u.id) in upcoming_preds:
+                    missing.append(u)  # has 90-min pick but no final_pick
+            non_voters_by_match.append({"match": match, "non_voters": missing, "is_knockout": knockout})
 
     # Live matches — show predictions without outcome
     live_match_rows = []
@@ -264,10 +274,16 @@ async def scoreboard(
                 (p.match_id, p.user_id): p for p in live_preds_result.scalars().all()
             }
             for match in live_matches:
+                knockout = is_knockout_match(match)
                 live_match_rows.append({
                     "match": match,
+                    "is_knockout": knockout,
                     "member_results": [
-                        {"user": u, "pick": live_preds[(match.id, u.id)].pick if (match.id, u.id) in live_preds else None}
+                        {
+                            "user": u,
+                            "pick": live_preds[(match.id, u.id)].pick if (match.id, u.id) in live_preds else None,
+                            "final_pick": live_preds[(match.id, u.id)].final_pick if (match.id, u.id) in live_preds else None,
+                        }
                         for u in members
                     ],
                 })
