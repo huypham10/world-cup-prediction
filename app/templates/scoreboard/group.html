@@ -433,12 +433,24 @@
         {{ mr.user.name }}
         {% if mr.user.id == current_user.id %}<span class="text-xs text-gray-400 font-normal">(you)</span>{% endif %}
       </span>
-      <span class="text-gray-500">
-        {% if mr.pick == 'A' %}{{ row.match.team_a }} win
-        {% elif mr.pick == 'B' %}{{ row.match.team_b }} win
-        {% elif mr.pick == 'draw' %}Draw
-        {% else %}<span class="italic text-gray-300">No prediction</span>{% endif %}
-      </span>
+      <div class="flex items-center gap-3 text-gray-500">
+        {% if row.is_knockout %}<span class="text-xs text-gray-400">90 mins:</span>{% endif %}
+        <span>
+          {% if mr.pick == 'A' %}{{ row.match.team_a }} win
+          {% elif mr.pick == 'B' %}{{ row.match.team_b }} win
+          {% elif mr.pick == 'draw' %}Draw
+          {% else %}<span class="italic text-gray-300">No prediction</span>{% endif %}
+        </span>
+        {% if row.is_knockout %}
+          <span class="text-gray-300 text-xs">|</span>
+          <span class="text-xs text-gray-400">Overall:</span>
+          <span>
+            {% if mr.final_pick == 'A' %}{{ row.match.team_a }}
+            {% elif mr.final_pick == 'B' %}{{ row.match.team_b }}
+            {% else %}<span class="italic text-gray-300">No pick</span>{% endif %}
+          </span>
+        {% endif %}
+      </div>
     </div>
     {% endfor %}
   </div>
@@ -501,6 +513,7 @@
         {% else %}
           <div class="flex items-center gap-3">
             {# 90-min pick #}
+            {% if row.is_knockout %}<span class="text-xs text-gray-400">90 mins:</span>{% endif %}
             <div class="flex items-center gap-1">
               <span class="text-gray-500">
                 {% if mr.pick == 'A' %}{{ match.team_a }} win
@@ -519,13 +532,14 @@
                 {% if mr.amount > 0 %}+{% endif %}{{ "%.10g" % (mr.amount|float) }}
               </span>
             {% endif %}
-            {# Final winner pick (knockout only) #}
+            {# Overall / final winner pick (knockout only) #}
             {% if row.is_knockout and match.final_winner %}
               <span class="text-gray-300 text-xs">|</span>
+              <span class="text-xs text-gray-400">Overall:</span>
               <div class="flex items-center gap-1">
-                <span class="text-gray-400 text-xs">
-                  {% if mr.final_pick == 'A' %}{{ match.team_a }}
-                  {% elif mr.final_pick == 'B' %}{{ match.team_b }}
+                <span class="text-gray-500">
+                  {% if mr.final_pick == 'A' %}{{ match.team_a }} win
+                  {% elif mr.final_pick == 'B' %}{{ match.team_b }} win
                   {% else %}<span class="italic text-gray-300">No pick</span>{% endif %}
                 </span>
                 {% if mr.final_correct %}
