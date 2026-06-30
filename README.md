@@ -189,7 +189,7 @@ The workflow at [.github/workflows/poll.yml](.github/workflows/poll.yml) is kept
 - **Late joiners** — a member who made a prediction before joining the group always has that prediction count. A member with no prediction who joined after kickoff is excluded by default; group owners can toggle this to count those as losses instead.
 - **No prediction = auto loss** — if a member has no prediction when a match finishes, the settlement records a loss for that match. For knockout matches, no eventual winner pick is also an auto loss for that half.
 - **Knockout consistency** — the server enforces that if you predict a team to win in 90 minutes, their eventual winner pick is auto-set to the same team. Only a draw pick unlocks the eventual winner choice.
-- **Knockout scoring** — each knockout match generates two settlement rows (90-min and eventual winner), each weighted 0.5, computed in the app rather than stored.
+- **Knockout scoring** — each knockout match generates two settlement rows (90-min and eventual winner), each weighted 0.5, computed in the app rather than stored. The 0.5 weighting applies only to the overall standings; per-round knockout tables count each prediction type independently with no weighting.
 - **Idempotency** — the settlement task uses `INSERT ... ON CONFLICT DO NOTHING` and the `match.settled` flag, so running it twice on the same match produces no duplicate rows.
 
 ## Wager settings
@@ -217,8 +217,8 @@ Each group has a scoreboard at `/groups/{id}/scoreboard` showing:
 - **Reminder to vote for upcoming games** — collapsible section at the top. Amber with warning icon if any group member hasn't predicted for a match starting within 24h; neutral gray ("Everyone has voted for upcoming games") once all predictions are in. Hidden when no matches are upcoming.
 - **Overall standings** — cumulative stats per member, ranked by win % then net. Columns: P (played) · ✓ (correct) · ✗ (wrong prediction, excludes auto-losses) · ✓% (win rate) · ✗% (miss rate — wrong as % of predicted) · ∅ (no prediction / auto-loss) · Mult · Net. Click any column header to sort. Mult is editable by the group owner. Knockout matches each count as 0.5 per prediction type, so a full knockout match (90-min + eventual winner) contributes 1 to P.
 - **Wager settings** — editable by group owner (win/loss amounts per round); read-only view for other members.
-- **Standings By Round** — per-round standings (collapsible), same columns
-- **Group Members' Prediction History by Match** — settled matches grouped by round (collapsible), showing each member's pick, outcome, and amount
+- **Standings By Round** — per-round standings (collapsible). Group-stage rounds use the same columns as overall standings. Knockout rounds use a split column layout with no 0.5 weighting — 90-min and Final predictions are counted independently: P · [90 mins: ✓ ✗ ✓% ✗% ∅] · [Final: ✓ ✗ ✓% ✗% ∅] · Mult · Net. Ranked by (correct 90-min, correct Final) descending.
+- **Group Members' Prediction History by Match** — settled and live matches grouped by round (collapsible). Each match shows a header with teams, scoreline (plus AET and penalty lines where applicable), date, and result bubbles (90 mins / Final). Below the header a table shows each member's picks: Member · 90 mins · Final (Final column only shown for knockout matches).
 
 Match kickoff times are displayed in the visitor's local timezone (converted client-side from UTC).
 
