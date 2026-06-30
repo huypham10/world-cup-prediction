@@ -36,10 +36,17 @@ def _compute_final_winner(
     pk_score_a: Optional[int],
     pk_score_b: Optional[int],
 ) -> Optional[str]:
-    """Return "A" or "B" for the outright winner of a knockout match.
+    """Return "A" or "B" for the outright winner of a knockout match, or None if
+    the winner cannot yet be determined from the available score data.
 
-    Priority: penalty shootout → extra time → regular time.
-    Returns None if scores are unavailable.
+    Resolution order:
+      1. 90-minute result — if not a draw, that team wins outright.
+      2. Extra time — missing ET scores are treated as 0-0 (some APIs omit them
+         when the match went straight to penalties with no ET goals).
+      3. Penalties — only checked when AET totals are equal.
+
+    Returns None when 90-min scores are unavailable, or when the match was a draw
+    through AET and no penalty scores have been received yet.
     """
     # 90-minute result
     if score_a is not None and score_b is not None and score_a != score_b:
@@ -100,7 +107,21 @@ async def sync_fixtures(
     Fetch upcoming fixtures from the API and upsert into the DB.
     After syncing, deletes unsettled matches that belong to a different league
     so switching FOOTBALL_LEAGUE_ID keeps the DB clean.
-    Returns the number of newly inserted fixtures.
+    Returns (new_count, newly_finished).
+
+    result vs final_winner:
+      - result: 90-minute outcome ("A", "B", or "draw"). Write-once — set when the
+        match first transitions to finished and never overwritten.
+      - final_winner: outright winner after ET/penalties ("A" or "B", knockout only).
+        Also write-once once set, but filled in lazily — if the API doesn't return
+        ET/pens scores in the same response that marks the match finished, subsequent
+        syncs will keep trying until _compute_final_winner returns a non-None value.
+        Missing ET scores are treated as 0-0 so penalty data alone is sufficient.
+
+    newly_finished increments on two events:
+      1. result transitions from None (match just finished).
+      2. final_winner transitions from None to a value for a knockout match.
+    Both events trigger settlement in the caller.
 
     round_date_rules: optional date-range → round-name mapping applied when the
     API returns an empty round_name. Set via ROUND_DATE_RULES in .env (staging only).
@@ -124,6 +145,9 @@ async def sync_fixtures(
         knockout = _is_knockout(f)
 
         if match:
+            # Existing match — update mutable fields on every sync.
+            # Team names and kickoff_time can change for knockout placeholders
+            # (e.g. "Winner Match 42") until the previous round is settled.
             match.team_a = f.team_a
             match.team_b = f.team_b
             match.kickoff_time = f.kickoff_time
@@ -139,16 +163,22 @@ async def sync_fixtures(
             match.group_name = f.group_name
             match.league_id = league_id
             if f.status == "finished":
+                # result is write-once: set on first finished sync, never overwritten.
                 if match.result is None:
+                    match.result = _compute_result(f.score_a, f.score_b)
                     newly_finished += 1
-                elif knockout and match.final_winner is None:
-                    newly_finished += 1
-                match.result = _compute_result(f.score_a, f.score_b)
-                if knockout:
+                # final_winner is filled in lazily: ET/pens data may arrive in a later
+                # API response than the one that first marked the match finished.
+                if knockout and match.final_winner is None:
                     match.final_winner = _compute_final_winner(
                         f.score_a, f.score_b, f.et_score_a, f.et_score_b, f.pk_score_a, f.pk_score_b,
                     )
+                    if match.final_winner is not None:
+                        newly_finished += 1
         else:
+            # New fixture — insert for the first time.
+            # Pre-compute final_winner in case the app was offline when the match
+            # was played and the API returns it already finished.
             final_winner = None
             if f.status == "finished" and knockout:
                 final_winner = _compute_final_winner(
