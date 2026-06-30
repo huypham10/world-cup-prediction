@@ -351,8 +351,8 @@
     <thead class="text-xs uppercase tracking-wide text-gray-400 border-b">
       <tr>
         <th class="text-left px-3 py-3 w-6" {% if round.is_knockout %}rowspan="2"{% endif %}>#</th>
-        <th class="text-left px-3 py-3 cursor-pointer select-none hover:text-gray-600" data-sort {% if round.is_knockout %}rowspan="2"{% endif %}>Player</th>
-        <th class="text-center px-2 py-3 cursor-pointer select-none hover:text-gray-600" data-sort {% if round.is_knockout %}rowspan="2"{% endif %}>P</th>
+        <th class="text-left px-3 py-3 cursor-pointer select-none hover:text-gray-600" data-sort {% if round.is_knockout %}rowspan="2" data-col="1"{% endif %}>Player</th>
+        <th class="text-center px-2 py-3 cursor-pointer select-none hover:text-gray-600" data-sort {% if round.is_knockout %}rowspan="2" data-col="2"{% endif %}>P</th>
         {% if round.is_knockout %}
         <th class="text-center px-2 py-1 border-l border-gray-200 text-gray-500" colspan="5">90 mins</th>
         <th class="text-center px-2 py-1 border-l-2 border-r-2 border-indigo-200 bg-indigo-50 text-indigo-500" colspan="5">Final</th>
@@ -363,23 +363,23 @@
         <th class="text-center px-2 py-3 cursor-pointer select-none hover:text-gray-600" data-sort>✗%</th>
         <th class="text-center px-2 py-3 cursor-pointer select-none hover:text-gray-600" data-sort>∅</th>
         {% endif %}
-        <th class="text-center px-2 py-3 cursor-pointer select-none hover:text-gray-600 border-l border-gray-100" data-sort {% if round.is_knockout %}rowspan="2"{% endif %}>Mult</th>
+        <th class="text-center px-2 py-3 cursor-pointer select-none hover:text-gray-600 border-l border-gray-100" data-sort {% if round.is_knockout %}rowspan="2" data-col="13"{% endif %}>Mult</th>
         {% if wagers_by_round %}
-        <th class="text-right px-3 py-3 cursor-pointer select-none hover:text-gray-600" data-sort {% if round.is_knockout %}rowspan="2"{% endif %}>Net</th>
+        <th class="text-right px-3 py-3 cursor-pointer select-none hover:text-gray-600" data-sort {% if round.is_knockout %}rowspan="2" data-col="14"{% endif %}>Net</th>
         {% endif %}
       </tr>
       {% if round.is_knockout %}
       <tr class="text-xs uppercase tracking-wide text-gray-400 border-b">
-        <th class="text-center px-2 py-2 cursor-pointer select-none hover:text-gray-600 border-l border-gray-200" data-sort>✓</th>
-        <th class="text-center px-2 py-2 cursor-pointer select-none hover:text-gray-600" data-sort>✗</th>
-        <th class="text-center px-2 py-2 cursor-pointer select-none hover:text-gray-600" data-sort>✓%</th>
-        <th class="text-center px-2 py-2 cursor-pointer select-none hover:text-gray-600" data-sort>✗%</th>
-        <th class="text-center px-2 py-2 cursor-pointer select-none hover:text-gray-600" data-sort>∅</th>
-        <th class="text-center px-2 py-2 cursor-pointer select-none hover:text-indigo-600 border-l-2 border-indigo-200 bg-indigo-50 text-indigo-400" data-sort>✓</th>
-        <th class="text-center px-2 py-2 cursor-pointer select-none hover:text-indigo-600 bg-indigo-50 text-indigo-400" data-sort>✗</th>
-        <th class="text-center px-2 py-2 cursor-pointer select-none hover:text-indigo-600 bg-indigo-50 text-indigo-400" data-sort>✓%</th>
-        <th class="text-center px-2 py-2 cursor-pointer select-none hover:text-indigo-600 bg-indigo-50 text-indigo-400" data-sort>✗%</th>
-        <th class="text-center px-2 py-2 cursor-pointer select-none hover:text-indigo-600 bg-indigo-50 text-indigo-400 border-r-2 border-indigo-200" data-sort>∅</th>
+        <th class="text-center px-2 py-2 cursor-pointer select-none hover:text-gray-600 border-l border-gray-200" data-sort data-col="3">✓</th>
+        <th class="text-center px-2 py-2 cursor-pointer select-none hover:text-gray-600" data-sort data-col="4">✗</th>
+        <th class="text-center px-2 py-2 cursor-pointer select-none hover:text-gray-600" data-sort data-col="5">✓%</th>
+        <th class="text-center px-2 py-2 cursor-pointer select-none hover:text-gray-600" data-sort data-col="6">✗%</th>
+        <th class="text-center px-2 py-2 cursor-pointer select-none hover:text-gray-600" data-sort data-col="7">∅</th>
+        <th class="text-center px-2 py-2 cursor-pointer select-none hover:text-indigo-600 border-l-2 border-indigo-200 bg-indigo-50 text-indigo-400" data-sort data-col="8">✓</th>
+        <th class="text-center px-2 py-2 cursor-pointer select-none hover:text-indigo-600 bg-indigo-50 text-indigo-400" data-sort data-col="9">✗</th>
+        <th class="text-center px-2 py-2 cursor-pointer select-none hover:text-indigo-600 bg-indigo-50 text-indigo-400" data-sort data-col="10">✓%</th>
+        <th class="text-center px-2 py-2 cursor-pointer select-none hover:text-indigo-600 bg-indigo-50 text-indigo-400" data-sort data-col="11">✗%</th>
+        <th class="text-center px-2 py-2 cursor-pointer select-none hover:text-indigo-600 bg-indigo-50 text-indigo-400 border-r-2 border-indigo-200" data-sort data-col="12">∅</th>
       </tr>
       {% endif %}
     </thead>
@@ -646,8 +646,9 @@
         th.appendChild(icon);
         const tbody = table.querySelector('tbody');
         const rows = [...tbody.querySelectorAll('tr')];
+        const col = th.dataset.col !== undefined ? parseInt(th.dataset.col) : colIdx;
         rows.sort((a, b) => {
-          const av = cellVal(a, colIdx), bv = cellVal(b, colIdx);
+          const av = cellVal(a, col), bv = cellVal(b, col);
           if (av === null && bv === null) return 0;
           if (av === null) return 1;
           if (bv === null) return -1;
