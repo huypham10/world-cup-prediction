@@ -130,12 +130,14 @@ Four HTTP endpoints, all guarded by `X-Task-Secret`:
 
 | Endpoint | What it does |
 |---|---|
-| `POST /tasks/sync` | Fetch fixtures from the football API and upsert into the DB. Automatically triggers settlement if any match transitions to finished during the sync. **Use this for the main cron job.** |
+| `POST /tasks/sync` | Fetch fixtures from the football API and upsert into the DB. Automatically triggers settlement when any match transitions to finished, or when a knockout match's `final_winner` is filled in for the first time. **Use this for the main cron job.** |
 | `POST /tasks/odds` | Fetch bookmaker 1x2 odds for upcoming scheduled matches. Skips matches fetched within the last hour. **Use a separate, less frequent cron job for this.** |
 | `POST /tasks/settle` | Settle finished, unsettled matches only. No fixture sync. Useful as a manual fallback. |
 | `POST /tasks/poll` | Runs sync then settle unconditionally. Kept for backward compatibility. |
 
-`/tasks/sync` detects the live → finished transition during the API loop (no extra DB query) and calls settlement immediately, so it replaces `/tasks/poll` as the recommended cron target.
+`/tasks/sync` detects the live → finished transition during the API loop and calls settlement immediately. It also re-triggers settlement if a knockout match previously finished without a `final_winner` (e.g. ET/pens scores arrived in a later API response) and that winner is now resolved. Already-settled matches (`settled=True`) are not automatically re-settled in either case — use "Re-settle" for those.
+
+`result` and `final_winner` are always recomputed on every sync for finished matches (not write-once). Missing ET scores are treated as 0-0 when computing `final_winner`, so penalty data alone is sufficient to determine the winner if the API omits extra-time scores.
 
 Prediction locking is enforced at the endpoint (`match.kickoff_time <= now`), not by this task.
 
