@@ -34,8 +34,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import settings
 from app.database import AsyncSessionLocal
 from app.football_client.client import BzzOiroClient, OddsData
-from app.football_client.sync import sync_fixtures
-from app.football_client.sync import is_knockout_match
+from app.football_client.sync import sync_fixtures, is_knockout_match, _KNOCKOUT_ROUND_NAMES
 from app.models.group import Group
 from app.models.group_wager import GroupWager
 from app.models.match import Match
@@ -141,7 +140,9 @@ async def _settle_match(
             created += (await db.execute(stmt)).rowcount
 
             # --- Final winner (knockout only) ---
-            if knockout:
+            # Skip final rows if final_winner not yet known — leaves settled=False
+            # so the next sync+settle pass can insert them correctly.
+            if knockout and match.final_winner is not None:
                 final_pick = prediction.final_pick if prediction else None
                 correct_final = final_pick is not None and final_pick == match.final_winner
                 stmt = (
@@ -180,8 +181,10 @@ async def settle(db: AsyncSession) -> None:
     logger.info("settle: %d matches to settle", len(unsettled))
 
     for match in unsettled:
+        knockout = is_knockout_match(match)
         count = await _settle_match(db, match, wagers_by_group_round)
-        match.settled = True
+        if not knockout or match.final_winner is not None:
+            match.settled = True
         await db.commit()
         logger.info(
             "settle: %s vs %s (match %s) — %d rows",
@@ -201,6 +204,14 @@ async def _sync_needed(db: AsyncSession) -> bool:
                 Match.status.like("live%"),
                 and_(Match.status == "finished", Match.settled.is_(False)),
                 and_(Match.status == "scheduled", Match.kickoff_time <= now + timedelta(hours=1)),
+                and_(
+                    Match.status == "finished",
+                    Match.final_winner.is_(None),
+                    or_(
+                        Match.round_name.in_(_KNOCKOUT_ROUND_NAMES),
+                        Match.round_number >= 4,
+                    ),
+                ),
             ),
         )
         .limit(1)

@@ -7,6 +7,7 @@ from fastapi import APIRouter, BackgroundTasks, Header, HTTPException
 
 from ..config import settings
 from ..tasks.poll_and_settle import run as poll_run, run_odds as odds_run, run_settle as settle_run, sync as sync_run
+from ..tasks.resettle import run_all as resettle_all_run
 
 router = APIRouter()
 
@@ -62,4 +63,16 @@ async def trigger_odds(
     if x_task_secret != settings.TASK_SECRET:
         raise HTTPException(status_code=401, detail="Invalid task secret")
     background_tasks.add_task(odds_run)
+    return {"status": "accepted"}
+
+
+@router.post("/tasks/resettle-all", status_code=202)
+async def trigger_resettle_all(
+    background_tasks: BackgroundTasks,
+    x_task_secret: str = Header(..., alias="X-Task-Secret"),
+):
+    """Delete all settlement rows across every group, reset settled flags, and re-run settlement."""
+    if x_task_secret != settings.TASK_SECRET:
+        raise HTTPException(status_code=401, detail="Invalid task secret")
+    background_tasks.add_task(resettle_all_run)
     return {"status": "accepted"}

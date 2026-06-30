@@ -1,4 +1,4 @@
-.PHONY: run migrate migrate-prod poll sync odds resettle wipe-data install
+.PHONY: run migrate migrate-prod poll sync odds resettle resettle-all wipe-data install
 
 run:
 	.venv/bin/uvicorn app.main:app --reload
@@ -22,6 +22,9 @@ odds:
 resettle:
 	@test -n "$(GROUP_ID)" || (echo "Usage: make resettle GROUP_ID=<id>" && exit 1)
 	set -a && source .env && set +a && .venv/bin/python -m app.tasks.resettle $(GROUP_ID)
+
+resettle-all:
+	set -a && source .env && set +a && .venv/bin/python -m app.tasks.resettle --all
 
 wipe-data:
 	@test -n "$(WIPE_URL)" || (echo "Usage: make wipe-data WIPE_URL=<database_url>" && exit 1)
