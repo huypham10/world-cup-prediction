@@ -170,6 +170,36 @@ async def scoreboard(
         win_pct = round(correct / played * 100) if played else 0
         return {"correct": correct, "wrong": wrong, "no_pred": no_pred, "played": played, "net": net, "win_pct": win_pct, "miss_pct": miss_pct}
 
+    def _knockout_round_stats(settlements: list[Settlement], multiplier: Decimal = Decimal("1"), predicted_match_ids: set[int] | None = None) -> dict:
+        predicted_match_ids = predicted_match_ids or set()
+        s90 = [s for s in settlements if s.prediction_type == "90min"]
+        sft = [s for s in settlements if s.prediction_type == "final"]
+        p = len(s90)
+
+        correct_90 = sum(1 for s in s90 if s.correct)
+        wrong_90 = sum(1 for s in s90 if not s.correct and s.match_id in predicted_match_ids)
+        null_90 = p - correct_90 - wrong_90
+        predicted_90 = correct_90 + wrong_90
+        win_pct_90 = round(correct_90 / p * 100) if p else 0
+        miss_pct_90 = round(wrong_90 / predicted_90 * 100) if predicted_90 else 0
+
+        correct_ft = sum(1 for s in sft if s.correct)
+        wrong_ft = sum(1 for s in sft if not s.correct and s.match_id in predicted_match_ids)
+        null_ft = len(sft) - correct_ft - wrong_ft
+        predicted_ft = correct_ft + wrong_ft
+        win_pct_ft = round(correct_ft / len(sft) * 100) if sft else 0
+        miss_pct_ft = round(wrong_ft / predicted_ft * 100) if predicted_ft else 0
+
+        raw_net = sum((s.amount for s in settlements if s.amount is not None), Decimal(0))
+        net = (raw_net * multiplier).quantize(Decimal("0.01"))
+        return {
+            "played": p,
+            "correct_90": correct_90, "wrong_90": wrong_90, "win_pct_90": win_pct_90, "miss_pct_90": miss_pct_90, "null_90": null_90,
+            "correct_ft": correct_ft, "wrong_ft": wrong_ft, "win_pct_ft": win_pct_ft, "miss_pct_ft": miss_pct_ft, "null_ft": null_ft,
+            "net": net,
+            "correct": correct_90,  # for sort compat
+        }
+
     standings = sorted(
         [{"user": u, **_stats(by_user.get(u.id, []), multiplier_by_user.get(u.id, Decimal("1")), predicted_match_ids_by_user.get(u.id))} for u in members],
         key=lambda x: (x["win_pct"], x["played"], x["net"]),
@@ -193,16 +223,19 @@ async def scoreboard(
 
     round_standings = []
     for label in sorted(round_kickoff, key=lambda r: round_kickoff[r], reverse=True):
+        all_round_setts = [s for setts in round_settlements[label].values() for s in setts]
+        round_is_knockout = any(s.prediction_type == "final" for s in all_round_setts)
+        stats_fn = _knockout_round_stats if round_is_knockout else _stats
         user_stats = sorted(
             [
-                {"user": u, **_stats(round_settlements[label].get(u.id, []), multiplier_by_user.get(u.id, Decimal("1")), predicted_match_ids_by_user.get(u.id))}
+                {"user": u, **stats_fn(round_settlements[label].get(u.id, []), multiplier_by_user.get(u.id, Decimal("1")), predicted_match_ids_by_user.get(u.id))}
                 for u in members
                 if round_settlements[label].get(u.id)  # only show eligible members
             ],
-            key=lambda x: (x["correct"], x["net"]),
+            key=lambda x: (x["correct_90"], x["correct_ft"]) if round_is_knockout else (x["correct"], x["net"]),
             reverse=True,
         )
-        round_standings.append({"label": label, "members": user_stats})
+        round_standings.append({"label": label, "members": user_stats, "is_knockout": round_is_knockout})
 
     # Load existing wagers for this group (for owner UI)
     wagers_result = await db.execute(
