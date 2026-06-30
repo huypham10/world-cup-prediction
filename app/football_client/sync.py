@@ -44,10 +44,10 @@ def _compute_final_winner(
     # 90-minute result
     if score_a is not None and score_b is not None and score_a != score_b:
         return "A" if score_a > score_b else "B"
-    # Extra time — only reached if 90-min was a draw
-    if et_score_a is not None and et_score_b is not None and score_a is not None and score_b is not None:
-        aet_total_a = score_a + et_score_a
-        aet_total_b = score_b + et_score_b
+    # Extra time — only reached if 90-min was a draw; treat missing ET scores as 0-0
+    if score_a is not None and score_b is not None:
+        aet_total_a = score_a + (et_score_a or 0)
+        aet_total_b = score_b + (et_score_b or 0)
         if aet_total_a != aet_total_b:
             return "A" if aet_total_a > aet_total_b else "B"
         # Penalties — only reached if AET was also a draw

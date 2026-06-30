@@ -550,6 +550,8 @@
           <span class="px-2 py-0.5 rounded-full bg-blue-50 text-blue-500 font-medium">
             Final: {% if match.final_winner == 'A' %}{{ match.team_a }}{% else %}{{ match.team_b }}{% endif %}
           </span>
+        {% elif row.is_knockout and match.result == 'draw' %}
+          <span class="px-2 py-0.5 rounded-full bg-gray-100 text-gray-400 font-medium">Final: —</span>
         {% endif %}
       </div>
     </div>
