@@ -138,13 +138,16 @@ async def sync_fixtures(
             match.round_name = effective_round_name
             match.group_name = f.group_name
             match.league_id = league_id
-            if f.status == "finished" and match.result is None:
+            if f.status == "finished":
+                if match.result is None:
+                    newly_finished += 1
+                elif knockout and match.final_winner is None:
+                    newly_finished += 1
                 match.result = _compute_result(f.score_a, f.score_b)
                 if knockout:
                     match.final_winner = _compute_final_winner(
                         f.score_a, f.score_b, f.et_score_a, f.et_score_b, f.pk_score_a, f.pk_score_b,
                     )
-                newly_finished += 1
         else:
             final_winner = None
             if f.status == "finished" and knockout:
